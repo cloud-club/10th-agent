@@ -17,6 +17,6 @@ Agent가 판단하기 위해 알아야 할 정보와 필요한 이유를 작성�
 ### **3. Tool 후보 2개**
 
 - k8sgpt
-    - k8s 환경 진단.
+    - https://github.com/k8sgpt-ai/k8sgpt
 - aws mcp 서버
     - https://docs.aws.amazon.com/ko_kr/agent-toolkit/latest/userguide/mcp-server.html
