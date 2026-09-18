@@ -1,0 +1,10 @@
+{
+  "fixture_version": 1,
+  "synthetic": true,
+  "current_month": "2026-08",
+  "previous_month": "2026-07",
+  "currency": "USD",
+  "services": [
+    {"name": "MOCK Example Compute", "current": 120.0, "previous": 100.0}
+  ]
+}

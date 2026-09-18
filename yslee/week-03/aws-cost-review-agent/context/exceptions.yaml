@@ -1,0 +1,10 @@
+# MOCK/example identifiers only. Do not commit real account identifiers.
+resources:
+  - resource_id: i-example-batch
+    action: exclude
+    reason: 월말 배치 처리를 위해 현재 사양 유지
+tag_rules:
+  - key: OptimizationExempt
+    value: "true"
+    action: exclude
+    reason: 비용 최적화 제외 태그

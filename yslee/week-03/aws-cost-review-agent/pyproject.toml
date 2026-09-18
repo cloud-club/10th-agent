@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws-cost-review-agent"
+version = "0.1.0"
+description = "Read-only AWS cost review agent with deterministic business exclusions"
+requires-python = ">=3.10"
+dependencies = [
+  "strands-agents",
+  "mcp",
+  "boto3",
+  "pydantic",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools]
+py-modules = ["app", "agent", "billing_mcp", "filters", "hooks", "models", "report"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
