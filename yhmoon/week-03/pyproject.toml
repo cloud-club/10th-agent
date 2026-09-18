@@ -1,0 +1,22 @@
+[project]
+name = "signoz-sre-agent"
+version = "0.1.0"
+description = "SigNoz MCP and kubectl incident-response agent"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.28,<1", "mcp>=1.12,<2", "python-dotenv>=1,<2", "jsonschema>=4.23,<5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+sre-agent = "sre_agent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["sre_agent"]
