@@ -1,0 +1,36 @@
+{
+  "fixture_version": 1,
+  "synthetic": true,
+  "items": [
+    {
+      "resourceId": "i-example-batch", "region": "us-east-1", "actionType": "Rightsize",
+      "estimatedMonthlySavings": 120.0, "estimatedSavingsPercentage": 25.0,
+      "implementationEffort": "Medium", "restartNeeded": true, "rollbackPossible": true,
+      "source": "ComputeOptimizer", "tags": [{"key": "Team", "value": "batch"}], "currencyCode": "USD"
+    },
+    {
+      "resourceId": "vol-example-archive", "region": "us-east-1", "actionType": "Delete",
+      "estimatedMonthlySavings": 30.0, "estimatedSavingsPercentage": 100.0,
+      "implementationEffort": "Low", "restartNeeded": false, "rollbackPossible": false,
+      "source": "CostExplorer", "tags": [{"key": "OptimizationExempt", "value": "true"}], "currencyCode": "USD"
+    },
+    {
+      "resourceId": "i-example-web", "region": "us-west-2", "actionType": "Rightsize",
+      "estimatedMonthlySavings": 80.0, "estimatedSavingsPercentage": 15.0,
+      "implementationEffort": "Medium", "restartNeeded": true, "rollbackPossible": true,
+      "source": "ComputeOptimizer", "tags": [{"key": "Team", "value": "web"}], "currencyCode": "USD"
+    },
+    {
+      "resourceId": "db-example-report", "region": "ap-northeast-2", "actionType": "Rightsize",
+      "estimatedMonthlySavings": 140.0, "estimatedSavingsPercentage": 20.0,
+      "implementationEffort": "High", "restartNeeded": true, "rollbackPossible": true,
+      "source": "ComputeOptimizer", "tags": [], "currencyCode": "USD"
+    },
+    {
+      "resourceId": "fn-example-idle", "region": "us-east-1", "actionType": "Review",
+      "estimatedSavingsPercentage": null,
+      "implementationEffort": "Low", "restartNeeded": false, "rollbackPossible": true,
+      "source": "CostExplorer", "tags": [], "currencyCode": "USD"
+    }
+  ]
+}
