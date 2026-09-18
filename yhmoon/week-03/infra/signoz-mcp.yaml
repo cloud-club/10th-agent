@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signoz-mcp
+  namespace: signoz
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: signoz-mcp}
+  template:
+    metadata:
+      labels: {app: signoz-mcp}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mcp
+          image: signoz/signoz-mcp-server:v0.14.0
+          ports:
+            - {name: http, containerPort: 8000}
+          env:
+            - {name: TRANSPORT_MODE, value: http}
+            - {name: MCP_SERVER_PORT, value: '8000'}
+            - {name: SIGNOZ_URL, value: 'http://signoz.signoz.svc.cluster.local:8080'}
+            - {name: SIGNOZ_INSTANCE_URL_ALLOWLIST, value: 'signoz.signoz.svc.cluster.local'}
+            - {name: SIGNOZ_DOCS_REFRESH_INTERVAL, value: '0'}
+            - {name: SIGNOZ_DOCS_FULL_REFRESH_INTERVAL, value: '0'}
+            - {name: LOG_LEVEL, value: info}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: '1', memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          startupProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /livez, port: http}
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signoz-mcp
+  namespace: signoz
+spec:
+  selector: {app: signoz-mcp}
+  ports:
+    - {name: http, port: 8000, targetPort: http}
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: signoz-mcp
+  namespace: istio-system
+spec:
+  hosts: [signozmcp.hoydev.kr]
+  gateways: [home-gateway]
+  http:
+    - match:
+        - uri: {exact: /mcp}
+      route:
+        - destination:
+            host: signoz-mcp.signoz.svc.cluster.local
+            port: {number: 8000}
+      timeout: 120s
