@@ -43,7 +43,7 @@ Strands Agent가 AWS Billing and Cost Management MCP Server에서 월간 비용 
 
 ## Run
 
-Python 3.10 이상. 프로젝트 디렉터리에서:
+Python 3.10 이상. 프로젝트 디렉터리에서 아래 명령어를 실행한다.
 
 ```sh
 python3 -m venv .venv
@@ -54,7 +54,7 @@ python -m pip install uv
 
 `uv`는 외부 MCP 서버 실행용 도구이며 프로젝트 패키지 dependency에 서버를 복사하지 않는다. AWS CLI는 mock 실행에 필요하지 않다.
 
-Mock (AWS 자격증명 불필요):
+Mock (AWS 자격증명 불필요)
 
 ```sh
 python app.py --previous 2026-07 --current 2026-08 --mock
