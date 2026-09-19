@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영업 회의록 에이전트</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e3e6ea; --text:#1f2937; --muted:#6b7280; --accent:#2563eb; --ok:#059669; --fail:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { padding:16px 24px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; }
+  header h1 { margin:0; font-size:18px; }
+  header span { color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px 24px; max-width:1500px; margin:0 auto; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card h2 { margin:0 0 12px; font-size:15px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  select, button { font:inherit; padding:7px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer; }
+  button.primary:disabled { opacity:.5; cursor:default; }
+  textarea { width:100%; min-height:420px; font:13px/1.55 "Consolas","D2Coding",monospace; padding:10px; border:1px solid var(--line); border-radius:8px; resize:vertical; }
+  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  .trace { list-style:none; padding:0; margin:0 0 12px; }
+  .trace li { padding:8px 10px; border-left:3px solid var(--line); margin-bottom:6px; background:#fafbfc; border-radius:0 6px 6px 0; }
+  .trace li.ok { border-color:var(--ok); }
+  .trace li.fail { border-color:var(--fail); }
+  .trace li.final { border-color:var(--accent); }
+  .trace code { font-size:12px; color:var(--muted); }
+  .trace .out { display:block; color:var(--muted); font-size:12px; margin-top:4px; white-space:pre-wrap; }
+  pre.md { white-space:pre-wrap; font:13px/1.6 "Noto Sans KR","Malgun Gothic",sans-serif; background:#fafbfc; border:1px solid var(--line); border-radius:8px; padding:14px; max-height:640px; overflow:auto; margin:0; }
+  .summary { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 12px; white-space:pre-wrap; margin-bottom:12px; }
+  .status { color:var(--muted); font-size:13px; }
+  .progress { height:6px; background:#e5e7eb; border-radius:3px; overflow:hidden; margin:-4px 0 10px; }
+  .bar { height:100%; width:0; background:var(--accent); transition:width .4s ease; }
+  .spinner { display:inline-block; width:12px; height:12px; border:2px solid #bfdbfe; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<header><h1>영업 회의록 에이전트</h1><span>회의 녹취 → 표준 회의록 · 액션아이템 · 직전 회의 승계</span></header>
+<main>
+  <section class="card">
+    <h2>입력 — 회의 녹취 / 메모</h2>
+    <div class="row">
+      <label>딜 <select id="deal"></select></label>
+      <label>회차 <select id="meeting"></select></label>
+      <button id="load">녹취 불러오기</button>
+      <button id="run" class="primary">에이전트 실행</button>
+      <span id="status" class="status"></span>
+    </div>
+    <div id="progress" class="progress" hidden><div id="bar" class="bar"></div></div>
+    <textarea id="transcript" placeholder="녹취나 메모를 붙여넣으세요. 저장된 파일을 불러와 수정해도 됩니다."></textarea>
+    <div class="hint">실행하면 이 내용이 deals/{딜}/transcript_{회차}.txt 에 저장된 뒤 에이전트가 읽습니다. 직전 회차 회의록(minutes_{회차}.md)이 같은 폴더에 있으면 자동으로 승계됩니다.</div>
+  </section>
+  <section class="card">
+    <h2>결과 — 도구 호출 과정과 회의록</h2>
+    <div id="summary" class="summary" hidden></div>
+    <ul id="trace" class="trace"></ul>
+    <div class="row"><button id="showPrev">이 회차의 저장된 회의록 보기</button></div>
+    <pre id="minutes" class="md">아직 실행 결과가 없습니다.</pre>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let deals = [];
+
+async function loadDeals() {
+  deals = await (await fetch('/api/deals')).json();
+  $('deal').innerHTML = deals.map(d => `<option value="${d.deal_id}">${d.deal_id}</option>`).join('');
+  fillMeetings();
+}
+function fillMeetings() {
+  const d = deals.find(x => x.deal_id === $('deal').value);
+  const nos = d.transcripts.map(t => parseInt(t.match(/transcript_(\d+)/)[1]));
+  const next = (nos.length ? Math.max(...nos) : 0) + 1;
+  $('meeting').innerHTML = [...nos, next].map(n =>
+    `<option value="${n}">${n}차${nos.includes(n) ? '' : ' (새 회차)'}${d.minutes.some(m => m.includes(String(n).padStart(2,'0'))) ? ' · 회의록 있음' : ''}</option>`).join('');
+}
+async function loadTranscript() {
+  const r = await (await fetch(`/api/transcript?deal_id=${$('deal').value}&meeting_no=${$('meeting').value}`)).json();
+  $('transcript').value = r.text || '';
+  if (r.error) $('status').textContent = r.error;
+}
+async function showMinutes() {
+  const r = await (await fetch(`/api/minutes?deal_id=${$('deal').value}&meeting_no=${$('meeting').value}`)).json();
+  $('minutes').textContent = r.markdown || r.error;
+}
+function renderTrace(trace) {
+  $('trace').innerHTML = trace.map(t => t.type === 'tool'
+    ? `<li class="${t.ok ? 'ok' : 'fail'}"><b>[${t.step}]</b> ${t.name} <code>${JSON.stringify(t.args)}</code><span class="out">${escapeHtml(t.output_preview)}</span></li>`
+    : t.type === 'route' ? `<li class="fail"><b>라우팅</b> ${escapeHtml(t.content)}</li>`
+    : t.type === 'nudge' ? `<li><b>[${t.step}]</b> ${escapeHtml(t.content)}</li>`
+    : `<li class="final"><b>[${t.step}]</b> 최종 답변</li>`).join('');
+}
+function escapeHtml(s) { return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+const STEP_LABELS = {
+  read_deal_context: '고객정보와 직전 회의록을 읽었습니다',
+  read_transcript: '이번 회의 녹취를 읽었습니다',
+  consult_sop: 'SOP 서브에이전트에 규칙을 확인했습니다',
+  save_minutes: '회의록을 작성해 저장했습니다',
+};
+const TOTAL = 4; // 정상 경로: 조회 → 녹취 → 저장 → 요약
+
+function setProgress(n, text) {
+  $('bar').style.width = Math.round(n / TOTAL * 100) + '%';
+  $('status').innerHTML = (n < TOTAL ? '<span class="spinner"></span>' : '') + `${n}/${TOTAL} · ${text}`;
+}
+
+async function run() {
+  const body = { deal_id: $('deal').value, meeting_no: parseInt($('meeting').value), transcript: $('transcript').value };
+  if (!body.transcript.trim()) { $('status').textContent = '녹취를 입력하세요.'; return; }
+  $('run').disabled = true; $('summary').hidden = true; $('trace').innerHTML = ''; $('minutes').textContent = '';
+  $('progress').hidden = false; setProgress(0, '서버에 요청을 보냈습니다');
+  const trace = []; let started = Date.now();
+  try {
+    const res = await fetch('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+        if (!line.startsWith('data: ')) continue;
+        const ev = JSON.parse(line.slice(6));
+        if (ev.type === 'start') setProgress(0, ev.message + ' (모델 응답 대기 중)');
+        else if (ev.type === 'step') {
+          trace.push(ev.entry); renderTrace(trace);
+          const e = ev.entry;
+          if (e.type === 'route' || e.type === 'nudge') { /* 표시만 */ }
+          else if (e.type === 'tool') setProgress(Math.min(trace.length, TOTAL - 1), (STEP_LABELS[e.name] || e.name) + (e.ok ? '' : ' — 오류, 모델이 다시 시도합니다') + ' · 다음 단계 대기 중');
+          else setProgress(TOTAL, '최종 요약을 받았습니다');
+        }
+        else if (ev.type === 'error') { $('status').textContent = '오류: ' + ev.message; }
+        else if (ev.type === 'done') {
+          $('summary').textContent = ev.final_answer; $('summary').hidden = false;
+          $('minutes').textContent = ev.markdown || '(회의록이 저장되지 않았습니다)';
+          setProgress(TOTAL, `완료 · ${Math.round((Date.now() - started) / 1000)}초 · ${ev.saved_path || ''}`);
+          await loadDeals(); $('meeting').value = body.meeting_no;
+        }
+      }
+    }
+  } catch (e) {
+    $('status').textContent = '오류: ' + e + ' — 서버(app.py)가 꺼졌거나 실행 중 재시작된 경우입니다. 터미널에서 python app.py 가 떠 있는지 확인하세요.';
+  } finally { $('run').disabled = false; }
+}
+
+$('deal').onchange = fillMeetings;
+$('load').onclick = loadTranscript;
+$('showPrev').onclick = showMinutes;
+$('run').onclick = run;
+loadDeals().then(loadTranscript);
+</script>
+</body>
+</html>

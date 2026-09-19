@@ -1,0 +1,6 @@
+.env
+__pycache__/
+.venv/
+# 사내 영업 SOP 정본은 공개 저장소에 올리지 않는다(로컬에만 배치). 안내문만 남긴다.
+knowledge/sop/*
+!knowledge/sop/README.md
