@@ -1,0 +1,135 @@
+{
+  "project_id": "prj-c-foundations",
+  "architecture_name": "Google Cloud Security Foundations Architecture",
+  "organization": "example-enterprise.com",
+  "resources": [
+    {
+      "id": "sec_folder",
+      "name": "Security & Operations (Central Project)",
+      "type": "security_project",
+      "category": "governance",
+      "parent": null
+    },
+    {
+      "id": "scc_monitor",
+      "name": "Security Command Center",
+      "type": "security_command_center",
+      "category": "security",
+      "parent": "sec_folder"
+    },
+    {
+      "id": "cloud_kms_key",
+      "name": "Cloud KMS (CMEK Keys)",
+      "type": "cloud_kms",
+      "category": "security",
+      "parent": "sec_folder"
+    },
+    {
+      "id": "cloud_logging_sink",
+      "name": "Central Audit Logging",
+      "type": "cloud_logging",
+      "category": "operations",
+      "parent": "sec_folder"
+    },
+    {
+      "id": "vpc_shared",
+      "name": "Shared VPC Network (Host Project)",
+      "type": "vpc_network",
+      "category": "networking",
+      "parent": null
+    },
+    {
+      "id": "subnet_ingress",
+      "name": "Public Ingress Subnet",
+      "type": "subnet",
+      "category": "networking",
+      "parent": "vpc_shared"
+    },
+    {
+      "id": "cloud_armor_waf",
+      "name": "Cloud Armor (WAF/DDoS)",
+      "type": "cloud_armor",
+      "category": "security",
+      "parent": "subnet_ingress"
+    },
+    {
+      "id": "alb_frontend",
+      "name": "External Application Load Balancer",
+      "type": "load_balancer",
+      "category": "networking",
+      "parent": "subnet_ingress"
+    },
+    {
+      "id": "subnet_app",
+      "name": "Private Application Subnet",
+      "type": "subnet",
+      "category": "networking",
+      "parent": "vpc_shared"
+    },
+    {
+      "id": "cloud_run_web",
+      "name": "Frontend Web App (Private Cloud Run)",
+      "type": "cloud_run",
+      "category": "compute",
+      "parent": "subnet_app"
+    },
+    {
+      "id": "subnet_data",
+      "name": "Private Data Subnet",
+      "type": "subnet",
+      "category": "networking",
+      "parent": "vpc_shared"
+    },
+    {
+      "id": "cloud_sql_db",
+      "name": "PostgreSQL DB (Private IP / PSA)",
+      "type": "cloud_sql",
+      "category": "database",
+      "parent": "subnet_data"
+    },
+    {
+      "id": "gcs_bucket",
+      "name": "Encrypted Asset Bucket (CMEK)",
+      "type": "cloud_storage",
+      "category": "storage",
+      "parent": null
+    }
+  ],
+  "connections": [
+    {
+      "source_id": "cloud_armor_waf",
+      "target_id": "alb_frontend",
+      "label": "WAF Policy"
+    },
+    {
+      "source_id": "alb_frontend",
+      "target_id": "cloud_run_web",
+      "label": "HTTPS (Port 443)"
+    },
+    {
+      "source_id": "cloud_run_web",
+      "target_id": "cloud_sql_db",
+      "label": "Private Service Access"
+    },
+    {
+      "source_id": "cloud_run_web",
+      "target_id": "gcs_bucket",
+      "label": "Private Google Access"
+    },
+    {
+      "source_id": "cloud_kms_key",
+      "target_id": "gcs_bucket",
+      "label": "CMEK Key Encryption"
+    },
+    {
+      "source_id": "vpc_shared",
+      "target_id": "cloud_logging_sink",
+      "label": "VPC Flow Logs"
+    },
+    {
+      "source_id": "vpc_shared",
+      "target_id": "scc_monitor",
+      "label": "Threat Detection"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+제공된 GCP 아키텍처 JSON 데이터를 바탕으로 draw.io에서 열람 및 편집 가능한 최적의 mxGraph XML을 생성해줘.
+
+### 1. GCP 리소스 데이터:
+{gcp_data}
+
+### 2. RAG 검색된 draw.io 스타일 지식:
+{retrieved_styles}
+
+### 3. 다이어그램 작성 규칙 및 레이아웃 레퍼런스:
+{layout_rules}
+
+### 4. 핵심 생성 지침 및 자가 검증 체크리스트:
+1. **GCP 최상위 배경 (Project Zone)**:
+   - 다이어그램의 가장 바깥 배경으로 `GCP/Zones/Project Zone` 컨테이너(`id="project_zone"`)를 생성하세요 (`parent="1"`).
+   - 좌상단에 `project_zone_logo` (구글 클라우드 로고)를 부착하세요.
+   - `parent: null`인 리소스(VPC, 독립 스토리지 버킷 등)는 모두 `parent="project_zone"` 내부에 배치하세요.
+2. **존(Zone) 크기 및 내부 아이콘 이탈 방지**:
+   - `project_zone`의 크기는 내부의 VPC, Subnet, 모든 리소스가 넉넉히 들어가고도 사방 최소 40px 이상의 여백이 남도록 충분히 크게(예: width=920, height=440 이상) 지정하세요.
+   - 어떤 리소스나 컨테이너도 `project_zone`을 벗어나거나 경계선에 걸치지 않아야 합니다.
+3. **내장 GCP 아이콘 스타일 적용 (파란 네모 방지)**:
+   - 각 리소스는 `retrieved_styles`에 명시된 해당 타입의 `style` 문자열을 1:1로 정확하게 적용하세요.
+   - 임의로 `fillColor=#4285F4;strokeColor=none;` 같은 기본 사각형 스타일로 덮어쓰지 마세요.
+4. **ID 및 계층 구조**:
+   - 리소스 노드의 `id`는 원본 JSON의 id("vpc_main", "subnet_public", "alb_frontend" 등)를 그대로 사용하세요.
+   - 자식 요소의 (x, y)는 부모의 좌측 상단 (0, 0) 기준 상대 좌표입니다.
+   - 타이틀 바 아래 여유 공간을 두고 배치하세요.
+5. **연결선(Edge)**:
+   - 모든 엣지의 parent는 "1"이어야 합니다.
+   - source와 target은 연결할 리소스의 원본 id를 지정하세요.
+   - 수평 연결 앵커(`exitX=1;exitY=0.5;entryX=0;entryY=0.5;`)를 적용하세요.
+
+주의: 마크다운 코드 블록(```xml ...)을 제외하고 순수한 XML 텍스트만 출력해줘.
