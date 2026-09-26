@@ -4,16 +4,21 @@
   1. read_deal_context  : 고객정보 + 딜 기억(지난 회의 누적 상태)
   2. read_transcript    : 이번 회의 녹취(길면 구간별 정리본)
   (선택) consult_sop    : SOP 서브에이전트에 규칙 확인
+  (선택) search_deal_history : 지난 회의 원문 근거 검색(관계 그래프 + BM25/RRF)
   3. save_minutes       : 규칙 검사 → 통과 시 회의록 저장·딜 기억 갱신 / 실패 시 사유를 돌려받아 고쳐서 재호출
   4. 최종 답변(요약)     → 루프 종료
 
 외부 LLM으로 나가는 모든 글은 MaskedLLM을 거친다(고객사명·인명 → 자리표시자).
+
+작업 기억: 한 번 실행하는 동안의 대화(messages)가 작업 기억이다. 실행이 끝나면(실패해도) runs/{딜}/에
+마스킹된 대화·도구 호출·저장 거부 사유·모델·토큰 사용량을 한 파일로 남긴다. 장기 기억(딜 기억)과 달리 다음 실행에 넣지 않는다.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -23,6 +28,7 @@ from .masking import MaskedLLM, Masker, build_dictionary
 from .tools import KNOWLEDGE_DIR, TOOL_FUNCTIONS, TOOL_SCHEMAS
 
 MAX_STEPS = 12  # 저장 거부 후 고쳐 쓰는 단계를 위해 Week 3(8)보다 늘렸다
+RUNS_DIR = tools.ROOT / "runs"
 
 
 def build_system_prompt(use_knowledge: bool = True) -> str:
@@ -39,6 +45,7 @@ def build_system_prompt(use_knowledge: bool = True) -> str:
    - save_minutes가 "저장 거부"를 돌려주면 적힌 사유를 모두 고친 회의록 전문으로 다시 save_minutes를 호출한다.
 4. 저장이 끝나면 한국어로 3줄 이내 요약(확보율 %, 새 액션아이템 수, 미확보 항목)을 답하고 끝낸다.
 (선택) 회의록을 쓰기 전에 SOP상 처리 방법이 애매한 점이 있으면 consult_sop로 한 번만 묻고, 답을 회의록에 반영한다. 예: 기한 없는 일의 처리, 참석자 기록 범위, 예산·의사결정 조직 기록 항목.
+(선택) 이번 녹취가 지난 회의 내용을 가리키는데 딜 기억 요약만으로 정확한 발언·금액·날짜를 알 수 없으면 search_deal_history로 원문을 찾는다. 현재 유효한 사실은 딜 기억을 따른다.
 
 규칙: 녹취와 고객정보에 있는 내용만으로 쓴다. 고객의 말은 고객 표현 그대로 옮긴다. 확인되지 않은 항목은 "확인 불가"로 적는다. 담당과 기한이 모두 있는 일만 액션아이템에 올리고, 그 밖의 일은 미합의 사항에 둔다. 모든 답변은 한국어로 쓴다.
 고객사명·인명이 [고객사A]·[인물1] 같은 자리표시자로 보일 수 있다. 자리표시자는 그대로 옮겨 적는다.
@@ -63,6 +70,7 @@ class RunResult:
     final_answer: str = ""
     trace: list[dict] = field(default_factory=list)
     saved_path: str | None = None
+    run_log: str | None = None
 
 
 def run_agent(
@@ -83,6 +91,18 @@ def run_agent(
         {"role": "user", "content": f"딜 {deal_id}의 {meeting_no}차 회의 녹취를 회의록으로 정리해 저장해줘."},
     ]
 
+    started = time.time()
+    try:
+        _loop(result, llm, messages, on_step)
+    except Exception as e:
+        result.final_answer = f"(실행 오류: {e})"
+        raise
+    finally:
+        result.run_log = save_run_log(result, llm, messages, started)
+    return result
+
+
+def _loop(result: RunResult, llm, messages: list[dict], on_step) -> None:
     nudges = 0
     for step in range(1, MAX_STEPS + 1):
         msg = llm.chat(messages, tools=TOOL_SCHEMAS)
@@ -137,8 +157,6 @@ def run_agent(
     else:
         result.final_answer = "(최대 단계 수에 도달해 중단했습니다)"
 
-    return result
-
 
 def _masked(llm, deal_id: str, meeting_no: int) -> MaskedLLM:
     deal_dir = tools._deal_dir(deal_id)
@@ -158,3 +176,40 @@ def _note_switch(llm, result: RunResult, on_step) -> None:
     reason = getattr(llm, "switched_reason", None)
     if reason and not any(e.get("type") == "route" for e in result.trace):
         _log(result, on_step, {"step": 0, "type": "route", "content": reason})
+
+
+
+def save_run_log(result: RunResult, llm, messages: list[dict], started: float) -> str:
+    """작업 기억을 파일로 남긴다. 외부로 나간 그대로(마스킹된 상태)를 저장해 기록 파일에 실명이 쌓이지 않게 한다."""
+    masker = getattr(llm, "masker", None)
+    hide = masker.mask if masker else (lambda x: x)
+
+    def clean(v):
+        if isinstance(v, str):
+            return hide(v)
+        if isinstance(v, list):
+            return [clean(x) for x in v]
+        if isinstance(v, dict):
+            return {k: clean(x) for k, x in v.items()}
+        return v
+
+    calls = list(getattr(llm, "usage_log", None) or [])
+    log = {
+        "deal_id": result.deal_id, "meeting_no": result.meeting_no,
+        "started": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(started)),
+        "elapsed_sec": round(time.time() - started, 1),
+        "saved": bool(result.saved_path),
+        "rejections": sum(1 for t in result.trace if t.get("name") == "save_minutes" and not t.get("ok")),
+        "route": getattr(llm, "switched_reason", None),
+        "masking": masker.summary() if masker else "off",
+        "usage": {"calls": len(calls), "prompt_tokens": sum(c["prompt_tokens"] for c in calls),
+                  "completion_tokens": sum(c["completion_tokens"] for c in calls), "by_call": calls},
+        "final_answer": hide(result.final_answer),
+        "trace": clean(result.trace),
+        "messages": clean(messages),
+    }
+    d = RUNS_DIR / result.deal_id
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{result.meeting_no:02d}_{time.strftime('%Y%m%d-%H%M%S', time.localtime(started))}.json"
+    p.write_text(json.dumps(log, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return str(p)

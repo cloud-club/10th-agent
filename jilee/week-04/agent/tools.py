@@ -1,15 +1,17 @@
-"""에이전트가 호출하는 Tool 4종(조회 2·SOP 문의·저장)과 그 스키마.
+"""에이전트가 호출하는 Tool 5종(조회 2·이력 검색·SOP 문의·저장)과 그 스키마.
 
 모델은 판단만 하고, 파일을 읽고 쓰는 행동은 여기 있는 파이썬 함수가 한다.
 Week 4: 조회는 딜 기억(상태 파일)을 읽고, 긴 녹취는 구간별로 정리해 넘기며, 저장은 규칙 검사를 통과해야 한다.
+지난 회의의 원문 근거가 필요하면 search_deal_history로 찾는다(관계 그래프 + 하이브리드 검색).
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
-from . import memory
+from . import graph, memory, retrieval
 from .sop_agent import consult_sop
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -154,9 +156,39 @@ def save_minutes(deal_id: str, meeting_no: int, markdown: str) -> str:
     p.write_text(markdown.strip() + "\n", encoding="utf-8")
     st = memory.update_state(prev, markdown, meeting_no)
     memory.save_snapshot(out, st)
+    save_graph(deal_id, d, out, st)
     k = memory.kpi(st)
     shown = p.relative_to(ROOT).as_posix() if p.is_relative_to(ROOT) else str(p)
     return f"저장 완료: {shown} ({len(markdown)}자) · 딜 기억 갱신 · 확보율 {k['확보율']} · 지난 액션 이행률 {k['이행률']}"
+
+
+def _company(d: Path) -> str:
+    m = re.search(r"^#\s*고객정보\s*[—-]\s*(.+)$", (d / "customer.md").read_text(encoding="utf-8"), re.M)
+    return m.group(1).strip() if m else ""
+
+
+def save_graph(deal_id: str, d: Path, out: Path, st: dict) -> Path:
+    p = out / "state" / f"graph_{st['meeting_no']:02d}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(graph.build_graph(st, _company(d)), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return p
+
+
+# ---- Tool ③ 이력 검색 -------------------------------------------------------
+
+def search_deal_history(deal_id: str, query: str, meeting_from: int | None = None, meeting_to: int | None = None,
+                        kind: str | None = None) -> str:
+    """지난 회의 녹취·회의록에서 원문 근거를 찾는다. 질문에 아는 인물이 있으면 관계 정보를 먼저 붙인다."""
+    d = _deal_dir(deal_id)
+    out = OUTPUT_DIR / deal_id
+    latest = max([int(q.stem.split("_")[1]) for q in out.glob("minutes_*.md")] or [0])
+    st = memory.load_before(deal_id, out, out, latest + 1)
+    g = graph.build_graph(st, _company(d))
+    named = [a["name"] for a in st["attendees"] if a["name"] in query]
+    head = [graph.person_view(g, n) for n in named]
+    results = retrieval.search(deal_id, d, out, query, meeting_from, meeting_to, kind, latest_meeting=latest,
+                               speakers=named or None)
+    return "\n\n".join([h for h in head if h] + [retrieval.format_results(results)])
 
 
 # ---- 스키마 (모델에게 알려주는 도구 설명) --------------------------------
@@ -207,6 +239,24 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_deal_history",
+            "description": "지난 회의의 녹취 발화·회의록 항목에서 원문 근거를 찾는다. 딜 기억에 요약만 있고 정확한 발언·숫자·날짜를 확인해야 할 때 호출한다. 결과마다 회차·날짜·화자와 앞뒤 발화가 붙는다. 현재 유효한 사실은 딜 기억이 기준이다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "deal_id": {"type": "string"},
+                    "query": {"type": "string", "description": "찾을 내용. 고객이 쓴 말·금액·날짜·인물 이름을 넣는다 (예: '선금 비율 이행보증보험')"},
+                    "meeting_from": {"type": "integer", "description": "이 회차부터(선택)"},
+                    "meeting_to": {"type": "integer", "description": "이 회차까지(선택)"},
+                    "kind": {"type": "string", "enum": ["발화", "회의록"], "description": "녹취 발화만 또는 회의록 항목만(선택)"},
+                },
+                "required": ["deal_id", "query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "save_minutes",
             "description": "표준 양식으로 작성한 회의록 마크다운을 저장한다. 작성이 끝나면 반드시 호출한다. 규칙 검사에 걸리면 저장 거부 사유가 돌아오니 고쳐서 다시 호출한다.",
             "parameters": {
@@ -226,5 +276,6 @@ TOOL_FUNCTIONS = {
     "consult_sop": consult_sop,
     "read_deal_context": read_deal_context,
     "read_transcript": read_transcript,
+    "search_deal_history": search_deal_history,
     "save_minutes": save_minutes,
 }

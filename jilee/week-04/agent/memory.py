@@ -150,6 +150,7 @@ def update_state(prev: dict, md: str, meeting_no: int) -> dict:
         if len(r) >= 3 and re.fullmatch(r"[가-힣]{2,4}", r[1]):
             a = by_name.setdefault(r[1], {"name": r[1], "side": r[0], "first_meeting": meeting_no})
             a.update(side=r[0], title=r[2], note=r[3] if len(r) > 3 else "", last_meeting=meeting_no)
+            a["meetings"] = sorted(set(a.get("meetings", [])) | {meeting_no})
     st["attendees"] = list(by_name.values())
 
     # 2절: 지난 액션아이템 결과를 기존 항목에 반영(항목명이 가장 비슷한 것과 짝짓기)

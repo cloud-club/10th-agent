@@ -70,6 +70,7 @@ class LLMClient:
             raise RuntimeError(".env에 LLM_BASE_URL, LLM_API_KEY, LLM_MODEL을 설정해야 합니다.")
         self.active = self.primary
         self.switched_reason: str | None = None  # 폴백으로 넘어갔다면 그 이유(화면·로그 표시용)
+        self.usage_log: list[dict] = []  # 호출마다 모델·토큰 사용량(실행 기록용)
 
     # 하위 호환: 기존 코드가 llm.model 등을 참조한다
     @property
@@ -124,6 +125,9 @@ class LLMClient:
             raise RuntimeError(f"LLM 호출 실패 ({e.code}): {detail[:500]}") from e
         if "choices" not in data:  # OpenRouter는 200으로 오류 본문을 주기도 한다
             raise RuntimeError(f"LLM 응답 형식 오류: {json.dumps(data, ensure_ascii=False)[:500]}")
+        u = data.get("usage") or {}
+        self.usage_log.append({"model": data.get("model") or p.model, "provider": p.name,
+                           "prompt_tokens": u.get("prompt_tokens", 0), "completion_tokens": u.get("completion_tokens", 0)})
         return data["choices"][0]["message"]
 
 

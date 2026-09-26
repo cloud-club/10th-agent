@@ -37,6 +37,7 @@ class AgentLoopTest(unittest.TestCase):
         self.patches = [
             mock.patch.object(tools, "DEALS_DIR", self.tmp / "deals"),
             mock.patch.object(tools, "OUTPUT_DIR", self.tmp / "out"),
+            mock.patch.object(agent_mod, "RUNS_DIR", self.tmp / "runs"),
         ]
         for p in self.patches:
             p.start()

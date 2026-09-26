@@ -128,7 +128,8 @@ class SaveRejectionLoopTest(unittest.TestCase):
         (d / "customer.md").write_text("# 고객정보 — 테스트상사(주)\n- 당사 담당: 김도현(영업)\n- 고객 접점(최초): 정수연 품질팀장", encoding="utf-8")
         (d / "transcript_01.txt").write_text("[2026-10-01]\n참석: (고객) 정수연 품질팀장 / (당사) 김도현\n김도현: 안녕하세요 테스트상사", encoding="utf-8")
         self.patches = [mock.patch.object(tools, "DEALS_DIR", self.tmp / "deals"),
-                        mock.patch.object(tools, "OUTPUT_DIR", self.tmp / "out")]
+                        mock.patch.object(tools, "OUTPUT_DIR", self.tmp / "out"),
+                        mock.patch.object(agent_mod, "RUNS_DIR", self.tmp / "runs")]
         for p in self.patches:
             p.start()
 
