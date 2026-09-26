@@ -82,7 +82,8 @@ class LLMClient:
         분당 한도(429)는 Retry-After만큼 기다렸다 재시도한다. 기다릴 시간이 LONG_WAIT_SEC보다 길거나
         재시도가 소진되면 폴백 제공자로 전환한다. 폴백이 없으면 그대로 오류를 낸다.
         """
-        for attempt in range(max_retries + 1):
+        attempt = 0
+        while True:
             try:
                 return self._post(self.active, messages, tools)
             except RateLimited as e:
@@ -90,12 +91,13 @@ class LLMClient:
                 if (e.wait > LONG_WAIT_SEC or attempt == max_retries) and can_fallback:
                     self.switched_reason = f"{self.primary.model}@{self.primary.base_url} 한도 초과({int(e.wait)}초 대기 요구) → 폴백 {self.fallback.model}"
                     self.active = self.fallback
-                    continue  # 폴백도 같은 재시도 규칙을 탄다(무료 공용 풀은 잠깐 막히는 일이 잦다)
+                    attempt = 0  # 폴백은 재시도 횟수를 새로 받는다(무료 공용 풀은 잠깐 막히는 일이 잦다)
+                    continue
                 if attempt < max_retries:
+                    attempt += 1
                     time.sleep(min(e.wait, LONG_WAIT_SEC))
                     continue
-                raise RuntimeError(f"LLM 호출 실패 (429): {e.detail[:500]}") from e
-        raise RuntimeError("LLM 호출 재시도 한도 초과")
+                raise RuntimeError(f"LLM 호출 실패 (429, {self.active.model}): {e.detail[:500]}") from e
 
     def _post(self, p: Provider, messages: list[dict], tools: list[dict] | None) -> dict:
         body: dict = {"model": p.model, "messages": messages, "temperature": 0.2, "max_tokens": 8192}

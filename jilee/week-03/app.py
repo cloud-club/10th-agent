@@ -40,6 +40,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (ROOT / "static" / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/deals":
             self._json(list_deals())
+        elif self.path == "/api/questions":
+            # 표준 질문 리스트 표를 {코드: [영역, 질문]}으로 넘긴다(미리보기에서 Q코드 옆에 내용을 붙이는 용도)
+            qs = {}
+            for line in (ROOT / "knowledge" / "표준질문리스트.md").read_text(encoding="utf-8").splitlines():
+                cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                if len(cells) >= 3 and cells[0].startswith("Q") and cells[0][1:].isdigit():
+                    qs[cells[0]] = cells[1:3]
+            self._json(qs)
         elif self.path.startswith("/api/transcript"):
             q = dict(p.split("=", 1) for p in self.path.split("?", 1)[1].split("&"))
             try:

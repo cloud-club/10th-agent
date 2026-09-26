@@ -29,6 +29,65 @@
   .trace code { font-size:12px; color:var(--muted); }
   .trace .out { display:block; color:var(--muted); font-size:12px; margin-top:4px; white-space:pre-wrap; }
   pre.md { white-space:pre-wrap; font:13px/1.6 "Noto Sans KR","Malgun Gothic",sans-serif; background:#fafbfc; border:1px solid var(--line); border-radius:8px; padding:14px; max-height:640px; overflow:auto; margin:0; }
+  pre.md.code { font:12.5px/1.6 "Consolas","D2Coding",monospace; background:#1f2430; color:#e6e9ef; border-color:#1f2430; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:12px; align-items:flex-end; }
+  .tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:8px 14px; cursor:pointer; color:var(--muted); }
+  .tabs button.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .tabs .sp { flex:1; }
+  .tabs .tool { font-size:12px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; color:var(--text); }
+  /* 미리보기: A4 문서 양식 */
+  .paper-wrap { background:#e9ebef; border-radius:8px; padding:20px; max-height:760px; overflow:auto; }
+  .paper { background:#fff; max-width:794px; margin:0 auto; padding:40px 36px; box-shadow:0 1px 4px rgba(0,0,0,.12); font-size:13px; line-height:1.65; color:#111; }
+  .paper .doc-top { display:flex; justify-content:space-between; font-size:11px; color:#555; border-bottom:1px solid #111; padding-bottom:6px; margin-bottom:18px; }
+  .paper h1 { font-size:22px; text-align:center; letter-spacing:.3em; margin:6px 0 20px; }
+  .paper h1 small { display:block; font-size:13px; letter-spacing:0; font-weight:400; color:#444; margin-top:6px; }
+  .paper h2 { font-size:14px; margin:22px 0 8px; padding:5px 8px; background:#f1f3f6; border-top:2px solid #111; }
+  .paper h3 { font-size:13px; margin:14px 0 6px; }
+  /* 표 규칙: 열 너비 고정(짧은 열은 헤더 이름으로 폭 지정, 나머지가 남는 폭을 나눔) · 한글은 어절 단위 줄바꿈 · 넘치면 표 안에서만 가로 스크롤 */
+  .paper .tbl { overflow-x:auto; margin:6px 0 10px; }
+  .paper table { width:100%; min-width:480px; border-collapse:collapse; table-layout:fixed; font-size:12.5px; }
+  .paper th, .paper td { border:1px solid #9aa0a8; padding:5px 7px; vertical-align:top; text-align:left; word-break:keep-all; overflow-wrap:anywhere; }
+  .paper th { background:#f1f3f6; font-weight:600; }
+  .paper td.c { text-align:center; }
+  .paper table.meta th { width:110px; }
+  .paper ul { margin:4px 0 8px; padding-left:20px; }
+  .paper li { margin:2px 0; }
+  .paper p { margin:6px 0; }
+  .paper .doc-foot { margin-top:28px; border-top:1px solid #111; padding-top:6px; font-size:11px; color:#555; text-align:right; }
+  /* 표준 질문 확보 현황 팝업 */
+  .tabs .tool:disabled { opacity:.45; cursor:default; }
+  .modal { position:fixed; inset:0; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; z-index:10; }
+  .modal[hidden] { display:none; }
+  .modal-box { background:#fff; border-radius:10px; width:min(760px, 100%); max-height:85vh; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line); }
+  .modal-head b { font-size:15px; }
+  .modal-head button { border:none; background:none; font-size:20px; line-height:1; cursor:pointer; color:var(--muted); padding:2px 6px; }
+  .modal-body { overflow:auto; padding:8px 16px 16px; }
+  .modal-body.paper { max-width:none; box-shadow:none; margin:0; padding:8px 16px 16px; }
+  .paper .cal-box { display:flex; gap:16px; flex-wrap:wrap; border:1px solid #9aa0a8; padding:10px 12px; margin:6px 0 10px; }
+  .paper .cals { display:flex; gap:14px; flex-wrap:wrap; }
+  .paper .cal { width:196px; }
+  .paper .cal-h { font-weight:600; font-size:12px; text-align:center; margin-bottom:4px; }
+  .paper .cal-g { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; font-size:11px; text-align:center; }
+  .paper .cal-g b { font-weight:600; color:#555; }
+  .paper .cal-g span { line-height:24px; border-radius:50%; }
+  .paper .cal-g .sun { color:#c62828; } .paper .cal-g .sat { color:#1e5bb8; }
+  .paper .cal-g .meet { background:#111; color:#fff; font-weight:700; }
+  .paper .cal-g .due { box-shadow:inset 0 0 0 2px #e07b00; font-weight:700; cursor:help; }
+  .paper .cal-g .meet.due { box-shadow:inset 0 0 0 2px #e07b00; }
+  .paper .cal-g .approx { box-shadow:none; outline:1.5px dashed #e07b00; outline-offset:-3px; cursor:help; }
+  .paper .lg.approx { outline:1.5px dashed #e07b00; outline-offset:-2px; }
+  .paper .cal-list .d.ap { color:#a15c00; }
+  .paper .cal-side { flex:1; min-width:200px; font-size:12px; }
+  .paper .cal-lg { color:#555; margin-bottom:6px; }
+  .paper .lg { display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:-1px; margin:0 3px 0 8px; }
+  .paper .lg.meet { background:#111; margin-left:0; } .paper .lg.due { box-shadow:inset 0 0 0 2px #e07b00; }
+  .paper .cal-list { list-style:none; padding:0; margin:0; }
+  .paper .cal-list li { padding:3px 0; border-bottom:1px dotted #ccc; word-break:keep-all; }
+  .paper .cal-list .d { display:inline-block; min-width:44px; font-weight:600; margin-right:6px; }
+  .paper .cal-list .d.nd { color:#888; font-weight:400; min-width:0; }
+  .paper .cal-none { color:#888; }
+  .paper .empty { color:#888; text-align:center; padding:60px 0; }
   .summary { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 12px; white-space:pre-wrap; margin-bottom:12px; }
   .status { color:var(--muted); font-size:13px; }
   .progress { height:6px; background:#e5e7eb; border-radius:3px; overflow:hidden; margin:-4px 0 10px; }
@@ -58,9 +117,24 @@
     <div id="summary" class="summary" hidden></div>
     <ul id="trace" class="trace"></ul>
     <div class="row"><button id="showPrev">이 회차의 저장된 회의록 보기</button></div>
-    <pre id="minutes" class="md">아직 실행 결과가 없습니다.</pre>
+    <div class="tabs">
+      <button id="tabPreview" class="on">미리보기</button>
+      <button id="tabCode">MD 코드</button>
+      <span class="sp"></span>
+      <button id="copyMd" class="tool">MD 복사</button>
+      <button id="qBtn" class="tool" disabled>표준 질문 확보 현황</button>
+      <button id="dlMd" class="tool">.md 저장</button>
+    </div>
+    <div id="previewPane" class="paper-wrap"><div id="paper" class="paper"><div class="empty">아직 실행 결과가 없습니다.</div></div></div>
+    <pre id="minutes" class="md code" hidden>아직 실행 결과가 없습니다.</pre>
   </section>
 </main>
+<div id="qModal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="qTitle">
+    <div class="modal-head"><b id="qTitle">표준 질문 확보 현황</b><button id="qClose" aria-label="닫기">×</button></div>
+    <div id="qBody" class="modal-body paper"></div>
+  </div>
+</div>
 <script>
 const $ = id => document.getElementById(id);
 let deals = [];
@@ -84,7 +158,7 @@ async function loadTranscript() {
 }
 async function showMinutes() {
   const r = await (await fetch(`/api/minutes?deal_id=${$('deal').value}&meeting_no=${$('meeting').value}`)).json();
-  $('minutes').textContent = r.markdown || r.error;
+  setMinutes(r.markdown || '', `minutes_${String($('meeting').value).padStart(2,'0')}.md`); if (!r.markdown) $('paper').innerHTML = '<div class="empty">' + escapeHtml(r.error || '회의록이 없습니다.') + '</div>';
 }
 function renderTrace(trace) {
   $('trace').innerHTML = trace.map(t => t.type === 'tool'
@@ -92,6 +166,199 @@ function renderTrace(trace) {
     : t.type === 'route' ? `<li class="fail"><b>라우팅</b> ${escapeHtml(t.content)}</li>`
     : t.type === 'nudge' ? `<li><b>[${t.step}]</b> ${escapeHtml(t.content)}</li>`
     : `<li class="final"><b>[${t.step}]</b> 최종 답변</li>`).join('');
+}
+// ── 회의록 표시: MD 원문 + 문서 양식 미리보기 ──
+let currentMd = '', currentName = 'minutes.md';
+let docQ = null; // 마지막으로 그린 회의록의 표준 질문 확보 현황
+function setMinutes(md, name) {
+  currentMd = md || '';
+  if (name) currentName = name;
+  $('minutes').textContent = currentMd || '아직 실행 결과가 없습니다.';
+  docQ = null;
+  $('paper').innerHTML = currentMd ? renderDoc(currentMd) : '<div class="empty">' + escapeHtml(md === undefined ? '아직 실행 결과가 없습니다.' : '회의록이 없습니다.') + '</div>';
+  $('qBtn').disabled = !docQ;
+  $('qBtn').textContent = '표준 질문 확보 현황' + (docQ ? qCount(docQ.html) : '');
+}
+function inline(s) {
+  return escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+}
+// 셀 안의 \| 는 글자로 살리고, 칸 수가 헤더보다 많으면 넘친 칸을 마지막 칸에 합쳐 표가 밀리지 않게 한다
+function splitRow(line) {
+  return line.trim().replace(/^\|/, '').replace(/\|\s*$/, '').replace(/\\\|/g, '\u0000').split('|').map(c => c.trim().replace(/\u0000/g, '|'));
+}
+function fitRow(r, n) { return r.length > n ? [...r.slice(0, n - 1), r.slice(n - 1).join(' / ')] : [...r, ...Array(n - r.length).fill('')]; }
+// 짧은 값이 들어가는 열은 폭을 고정한다(헤더 이름 기준). 목록에 없는 열이 남은 폭을 나눠 가진다.
+const COL_WIDTH = [
+  [/^(코드|구분)$/, 56, true], [/^(중요도|시급성)$/, 64, true], [/^(상태|결과)/, 92, true],
+  [/^(이름)$/, 70, false], [/^(담당)$/, 110, false], [/^(기한)$/, 100, false], [/^(영역)$/, 84, false], [/^(직위|직위\/역할)$/, 100, false],
+];
+function colSpec(h) { const hit = COL_WIDTH.find(([re]) => re.test(h)); return hit ? { w: hit[1], center: hit[2] } : { w: 0, center: false }; }
+function renderDoc(md) {
+  const lines = md.replace(/\r/g, '').split('\n');
+  let html = '', i = 0, beforeFirstH2 = true, meta = [], folded = false, qTitle = '', h2 = '', meetingDate = null, calPlaced = false;
+  const dues = []; // 액션아이템 기한 → 캘린더 표시용
+  const flushMeta = () => {
+    if (!meta.length) return;
+    for (const [k, v] of meta) if (/일시|날짜|일자/.test(k) && !meetingDate) meetingDate = parseDate(v);
+    html += '<div class="tbl"><table class="meta"><colgroup><col style="width:110px"><col></colgroup>' + meta.map(([k, v]) => `<tr><th>${inline(k)}</th><td>${inline(v)}</td></tr>`).join('') + '</table></div>';
+    meta = [];
+    if (!calPlaced) { html += '<!--CAL-->'; calPlaced = true; }
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^#\s/.test(line)) {
+      const [title, sub] = line.slice(2).split(/\s+—\s+/);
+      html += sub ? `<h1>${inline(title)}<small>${inline(sub)}</small></h1>` : `<h1>${inline(title)}</h1>`;
+      i++; continue;
+    }
+    if (/^##\s/.test(line)) {
+      flushMeta(); beforeFirstH2 = false;
+      if (folded) { html += '<!--/Q-->'; folded = false; }
+      const title = line.slice(3); h2 = title;
+      // 표준 질문 확보 현황은 회의록 본문이 아니라 참고 정보라 문서에서 빼고 팝업으로 보여준다
+      if (/확보된 표준 질문/.test(title)) { html += '<!--Q-->'; folded = true; qTitle = title.replace(/^\d+\.\s*/, ''); }
+      else html += `<h2>${inline(title)}</h2>`;
+      i++; continue;
+    }
+    if (/^###\s/.test(line)) { html += `<h3>${inline(line.slice(4))}</h3>`; i++; continue; }
+    if (/^\s*\|/.test(line)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const head = splitRow(rows[0]), spec = head.map(colSpec);
+      const body = rows.slice(/^\s*\|[\s:|-]+\|?\s*$/.test(rows[1] || '') ? 2 : 1).map(splitRow);
+      const dueCol = head.findIndex(h => /^기한/.test(h));
+      if (dueCol >= 0 && /액션아이템/.test(h2) && !/지난/.test(h2))
+        body.forEach(r => dues.push({ item: r[0] || '', who: r[1] || '', raw: r[dueCol] || '' }));
+      html += '<div class="tbl"><table><colgroup>' + spec.map(c => c.w ? `<col style="width:${c.w}px">` : '<col>').join('') + '</colgroup>'
+        + '<thead><tr>' + head.map(h => `<th>${inline(h)}</th>`).join('') + '</tr></thead><tbody>'
+        + body.map(r => '<tr>' + fitRow(r, head.length).map((c, k) => `<td${spec[k].center ? ' class="c"' : ''}>${inline(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table></div>';
+      continue;
+    }
+    if (/^\s*[-*]\s/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*]\s/, ''));
+      // 'Q코드만 나열한 목록'(이전 양식)은 코드별 확인 항목을 붙인 표로 풀어 보여준다
+      const qRows = expandQCodes(items);
+      if (qRows) { flushMeta(); html += qRows; continue; }
+      // 제목 바로 아래 '키: 값' 목록은 문서 머리 정보표로 보여준다
+      if (beforeFirstH2 && items.every(t => /^[^:：]{1,20}[:：]\s/.test(t))) {
+        meta.push(...items.map(t => { const k = t.search(/[:：]/); return [t.slice(0, k), t.slice(k + 1).trim()]; }));
+      } else {
+        flushMeta();
+        html += '<ul>' + items.map(t => `<li>${inline(t)}</li>`).join('') + '</ul>';
+      }
+      continue;
+    }
+    if (line.trim()) { flushMeta(); html += `<p>${inline(line)}</p>`; }
+    i++;
+  }
+  flushMeta();
+  if (folded) html += '<!--/Q-->';
+  const qm = html.match(/<!--Q-->([\s\S]*?)<!--\/Q-->/);
+  docQ = qm ? { title: qTitle, html: qm[1] } : null;
+  html = html.replace(/<!--Q-->[\s\S]*?<!--\/Q-->/, '');
+  html = html.replace('<!--CAL-->', renderCalendar(meetingDate, dues));
+  const deal = $('deal').value || '', no = String($('meeting').value || '').padStart(2, '0');
+  return `<div class="doc-top"><span>영업 회의록 · ${escapeHtml(deal)}</span><span>문서번호 ${escapeHtml(deal)}-MTG-${no}</span></div>`
+    + html + `<div class="doc-foot">영업 회의록 에이전트 작성 · 담당자 검토 후 확정</div>`;
+}
+// ── 날짜 캘린더: 회의일과 액션아이템 기한을 달력에 찍는다 ──
+function parseDate(s, base) {
+  let m = (s || '').match(/(\d{4})[-.\/]\s*(\d{1,2})[-.\/]\s*(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = (s || '').match(/(\d{1,2})월\s*(\d{1,2})일/);
+  if (m && base) {
+    const d = new Date(base.getFullYear(), +m[1] - 1, +m[2]);
+    if (d < new Date(base.getFullYear(), base.getMonth() - 1, 1)) d.setFullYear(d.getFullYear() + 1); // 해를 넘긴 기한
+    return d;
+  }
+  return null;
+}
+// '이번 주 · 다음 주 · 그 다음 주 · N월 첫째 주' 같은 말은 회의일 기준 그 주 금요일로 어림한다(달력에는 점선으로 구분)
+function approxDate(s, base) {
+  if (!s || !base) return null;
+  const friday = (d, addWeeks) => { const x = new Date(d); x.setDate(x.getDate() + (5 - x.getDay()) + 7 * addWeeks); return x; };
+  if (/그\s*다음\s*주/.test(s)) return friday(base, 2);
+  if (/다음\s*주/.test(s)) return friday(base, 1);
+  if (/이번\s*주/.test(s)) return friday(base, 0);
+  const m = s.match(/(\d{1,2})월\s*(첫|둘|셋|넷|세|네)\S*\s*주/);
+  if (m) {
+    const n = { 첫: 0, 둘: 1, 셋: 2, 세: 2, 넷: 3, 네: 3 }[m[2]];
+    const first = new Date(base.getFullYear(), +m[1] - 1, 1);
+    if (first < new Date(base.getFullYear(), base.getMonth() - 1, 1)) first.setFullYear(first.getFullYear() + 1);
+    return friday(first, n);
+  }
+  return null;
+}
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function renderCalendar(meeting, dues) {
+  if (!meeting) return '';
+  const marks = {}, undated = [];
+  const add = (d, kind, text) => { (marks[ymd(d)] = marks[ymd(d)] || []).push({ kind, text }); };
+  add(meeting, 'meet', '회의일');
+  for (const u of dues) {
+    const d = parseDate(u.raw, meeting);
+    const a = d ? null : approxDate(u.raw, meeting);
+    if (d) add(d, 'due', `${u.item} (${u.who})`);
+    else if (a) add(a, 'approx', `${u.item} (${u.who}) — "${u.raw}" 어림`);
+    else if (u.raw && u.raw !== '-') undated.push(u);
+  }
+  // 회의 달부터 가장 늦은 기한 달까지(최대 3개월)
+  const last = Object.keys(marks).sort().pop().split('-').map(Number);
+  const months = [];
+  for (let y = meeting.getFullYear(), m = meeting.getMonth(); months.length < 3 && (y < last[0] || (y === last[0] && m <= last[1] - 1)); m++) {
+    if (m > 11) { m = 0; y++; }
+    months.push([y, m]);
+  }
+  const month = ([y, m]) => {
+    const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+    let cells = '';
+    for (let k = 0; k < first; k++) cells += '<span></span>';
+    for (let d = 1; d <= days; d++) {
+      const key = ymd(new Date(y, m, d)), mk = marks[key] || [], dow = (first + d - 1) % 7;
+      const cls = [mk.some(x => x.kind === 'meet') && 'meet', mk.some(x => x.kind === 'due') && 'due', !mk.some(x => x.kind === 'due') && mk.some(x => x.kind === 'approx') && 'approx', dow === 0 && 'sun', dow === 6 && 'sat'].filter(Boolean).join(' ');
+      cells += `<span class="${cls}"${mk.length ? ` title="${escapeHtml(mk.map(x => x.text).join(' / '))}"` : ''}>${d}</span>`;
+    }
+    return `<div class="cal"><div class="cal-h">${y}년 ${m + 1}월</div><div class="cal-g">${'일월화수목금토'.split('').map(w => `<b>${w}</b>`).join('')}${cells}</div></div>`;
+  };
+  const list = Object.keys(marks).sort().flatMap(k => marks[k].filter(x => x.kind !== 'meet').map(x => `<li><span class="d${x.kind === 'approx' ? ' ap' : ''}">${x.kind === 'approx' ? '~' : ''}${k.slice(5).replace('-', '/')}</span>${escapeHtml(x.text)}</li>`));
+  undated.forEach(u => list.push(`<li><span class="d nd">${escapeHtml(u.raw)}</span>${escapeHtml(u.item)} (${escapeHtml(u.who)})</li>`));
+  return `<div class="cal-box"><div class="cals">${months.map(month).join('')}</div>`
+    + `<div class="cal-side"><div class="cal-lg"><i class="lg meet"></i>회의일 <i class="lg due"></i>기한 <i class="lg approx"></i>기한(말로 한 날짜 어림)</div>`
+    + (list.length ? `<ul class="cal-list">${list.join('')}</ul>` : '<div class="cal-none">기한이 적힌 액션아이템이 없습니다.</div>') + '</div></div>';
+}
+// 팝업 버튼에 '확보 n/11'을 붙인다. 상태 칸의 글자를 세는 것이라 양식이 달라 셀 수 없으면 생략한다
+function qCount(h) {
+  const rows = h.match(/<tr><td>Q\d{2}<\/td>[\s\S]*?<\/tr>/g) || [];
+  if (!rows.length) return '';
+  const got = rows.filter(r => { const t = r.replace(/<[^>]+>/g, ' '); return /확보/.test(t) && !/미확보/.test(t); }).length;
+  return ` · ${got}/${rows.length}`;
+}
+function openQ() {
+  if (!docQ) return;
+  $('qTitle').textContent = docQ.title || '표준 질문 확보 현황';
+  $('qBody').innerHTML = docQ.html; $('qModal').hidden = false;
+}
+function closeQ() { $('qModal').hidden = true; }
+let QMAP = {};
+fetch('/api/questions').then(r => r.json()).then(m => { QMAP = m; if (currentMd) setMinutes(currentMd); }).catch(() => {});
+function expandQCodes(items) {
+  if (!Object.keys(QMAP).length) return '';
+  const rows = [], rest = [];
+  for (const t of items) {
+    const m = t.match(/^([^:：]+)[:：]\s*((?:Q\d{2}[\s,·]*)+)$/);
+    if (m) m[2].match(/Q\d{2}/g).forEach(c => rows.push([c, m[1].trim()]));
+    else rest.push(t);
+  }
+  if (!rows.length) return '';
+  rows.sort((a, b) => a[0].localeCompare(b[0]));
+  return '<div class="tbl"><table><colgroup><col style="width:56px"><col style="width:84px"><col><col style="width:92px"></colgroup><thead><tr><th>코드</th><th>영역</th><th>확인 항목</th><th>상태</th></tr></thead><tbody>'
+    + rows.map(([c, st]) => `<tr><td>${c}</td><td>${escapeHtml((QMAP[c] || [])[0] || '')}</td><td>${escapeHtml((QMAP[c] || [])[1] || '')}</td><td>${escapeHtml(st.replace(/^이번 회의로 /, ''))}</td></tr>`).join('')
+    + '</tbody></table></div>' + (rest.length ? '<ul>' + rest.map(t => `<li>${inline(t)}</li>`).join('') + '</ul>' : '');
+}
+function showTab(preview) {
+  $('tabPreview').classList.toggle('on', preview); $('tabCode').classList.toggle('on', !preview);
+  $('previewPane').hidden = !preview; $('minutes').hidden = preview;
 }
 function escapeHtml(s) { return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
@@ -111,7 +378,7 @@ function setProgress(n, text) {
 async function run() {
   const body = { deal_id: $('deal').value, meeting_no: parseInt($('meeting').value), transcript: $('transcript').value };
   if (!body.transcript.trim()) { $('status').textContent = '녹취를 입력하세요.'; return; }
-  $('run').disabled = true; $('summary').hidden = true; $('trace').innerHTML = ''; $('minutes').textContent = '';
+  $('run').disabled = true; $('summary').hidden = true; $('trace').innerHTML = ''; setMinutes(undefined);
   $('progress').hidden = false; setProgress(0, '서버에 요청을 보냈습니다');
   const trace = []; let started = Date.now();
   try {
@@ -135,7 +402,7 @@ async function run() {
         else if (ev.type === 'error') { $('status').textContent = '오류: ' + ev.message; }
         else if (ev.type === 'done') {
           $('summary').textContent = ev.final_answer; $('summary').hidden = false;
-          $('minutes').textContent = ev.markdown || '(회의록이 저장되지 않았습니다)';
+          setMinutes(ev.markdown || '', `minutes_${String(body.meeting_no).padStart(2,'0')}.md`);
           setProgress(TOTAL, `완료 · ${Math.round((Date.now() - started) / 1000)}초 · ${ev.saved_path || ''}`);
           await loadDeals(); $('meeting').value = body.meeting_no;
         }
@@ -150,6 +417,24 @@ $('deal').onchange = fillMeetings;
 $('load').onclick = loadTranscript;
 $('showPrev').onclick = showMinutes;
 $('run').onclick = run;
+$('tabPreview').onclick = () => showTab(true);
+$('qBtn').onclick = openQ;
+$('qClose').onclick = closeQ;
+$('qModal').onclick = e => { if (e.target === $('qModal')) closeQ(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQ(); });
+$('tabCode').onclick = () => showTab(false);
+$('copyMd').onclick = async () => {
+  if (!currentMd) return;
+  try { await navigator.clipboard.writeText(currentMd); $('copyMd').textContent = '복사됨'; }
+  catch { $('copyMd').textContent = '복사 실패'; }
+  setTimeout(() => $('copyMd').textContent = 'MD 복사', 1500);
+};
+$('dlMd').onclick = () => {
+  if (!currentMd) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([currentMd], { type: 'text/markdown;charset=utf-8' }));
+  a.download = `${$('deal').value}_${currentName}`; a.click(); URL.revokeObjectURL(a.href);
+};
 loadDeals().then(loadTranscript);
 </script>
 </body>
