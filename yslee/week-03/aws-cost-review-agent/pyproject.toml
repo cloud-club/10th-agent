@@ -19,7 +19,7 @@ dependencies = [
 dev = ["pytest"]
 
 [tool.setuptools]
-py-modules = ["app", "agent", "billing_mcp", "filters", "hooks", "models", "report"]
+py-modules = ["app", "agent", "billing_mcp", "comparison", "filters", "hooks", "models", "report"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

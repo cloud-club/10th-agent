@@ -13,10 +13,16 @@ from pydantic import ValidationError
 
 from agent import ModelSetupError, make_agent, review_request
 from billing_mcp import BillingMCPError, discover_billing_tools, make_billing_client, server_environment
+from comparison import COMPARISONS_OPERATION, DRIVERS_OPERATION
 from filters import load_exceptions
 from hooks import ReadOnlyBillingHook
-from models import ReviewAnalysis
+from models import ReviewAnalysis, ReviewPeriod
 from report import write_report
+
+COMPARISON_FIXTURES = {
+    COMPARISONS_OPERATION: "fixtures/cost_comparison.json",
+    DRIVERS_OPERATION: "fixtures/cost_comparison_drivers.json",
+}
 
 
 def parse_month(value: str) -> str:
@@ -34,26 +40,47 @@ def mock_analysis() -> ReviewAnalysis:
     """Fixture-backed prose, not an LLM or AWS response."""
     return ReviewAnalysis(
         summary="MOCK 예제 데이터에 대한 월간 비용 검토입니다. 실제 AWS 비용이 아닙니다.",
-        cost_change_explanation="MOCK 비용 비교 fixture의 서비스별 원본 값을 참고하세요. "
-        "실제 비용 변화나 원인은 이 실행에서 확인하지 않았습니다.",
+        cost_change_explanation="MOCK 비용 비교 표는 fixture의 total_cost_and_usage, 항목별 비교, cost driver 값을 "
+        "Python이 그대로 옮긴 것입니다. 실제 비용 변화나 원인은 이 실행에서 확인하지 않았습니다.",
         priority_explanation="MOCK 권고는 source의 estimatedMonthlySavings가 있는 항목을 "
         "내림차순으로 표시했습니다. 업무 예외 적용 여부는 Python의 정확 일치 규칙으로 결정했습니다.",
         limitations=["MOCK: AWS/MCP 및 Bedrock을 호출하지 않았습니다. 설명은 예제용 고정 문구입니다."],
     )
 
 
-def run_mock(previous: str, current: str, hook: ReadOnlyBillingHook, root: Path) -> Path:
-    comparison = json.loads((root / "fixtures/cost_comparison.json").read_text(encoding="utf-8"))
-    optimization = json.loads((root / "fixtures/recommendations.json").read_text(encoding="utf-8"))
-    if not comparison.get("synthetic") or not optimization.get("synthetic"):
-        raise ValueError("MOCK fixture에 synthetic 표시가 없습니다.")
-    if (comparison.get("previous_month"), comparison.get("current_month")) != (previous, current):
-        raise ValueError("MOCK fixture의 비교 월이 CLI 입력과 다릅니다.")
-    hook.record_cost_comparison(comparison)
-    hook.process_optimization(optimization)
+def _load_synthetic_fixture(root: Path, relative: str) -> dict:
+    payload = json.loads((root / relative).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not payload.get("synthetic"):
+        raise ValueError(f"MOCK fixture에 synthetic 표시가 없습니다: {relative}")
+    return payload
+
+
+def run_mock(period: ReviewPeriod, hook: ReadOnlyBillingHook, root: Path, output_dir: Path) -> Path:
+    """Feed fixtures through the same request validation, filtering, and rendering as a live run."""
+    for operation, relative in COMPARISON_FIXTURES.items():
+        fixture = _load_synthetic_fixture(root, relative)
+        if (fixture.get("previous_month"), fixture.get("current_month")) != (period.previous, period.current):
+            raise ValueError(f"MOCK fixture의 비교 월이 CLI 입력과 다릅니다: {relative}")
+        if fixture.get("operation") != operation:
+            raise ValueError(f"MOCK fixture의 operation이 {operation}이 아닙니다: {relative}")
+        request = {
+            "operation": operation,
+            "metric_for_comparison": fixture.get("metric_for_comparison", "UnblendedCost"),
+            **period.tool_dates(),
+        }
+        refusal = hook.accept_comparison_request(request)
+        if refusal:
+            raise ValueError(f"MOCK 비교 요청이 거부됐습니다: {refusal}")
+        hook.process_comparison(
+            operation, {"status": fixture.get("status", "success"), "data": fixture.get("data")}
+        )
+    hook.process_optimization(_load_synthetic_fixture(root, "fixtures/recommendations.json"))
+    missing = hook.snapshot.missing_sources()
+    if missing:
+        raise ValueError("MOCK source가 완전하지 않습니다: " + ", ".join(missing))
     return write_report(
-        previous=previous, current=current, mode="MOCK", analysis=mock_analysis(),
-        snapshot=hook.snapshot, directory=root / "reports",
+        previous=period.previous, current=period.current, mode="MOCK", analysis=mock_analysis(),
+        snapshot=hook.snapshot, directory=output_dir,
     )
 
 
@@ -65,20 +92,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--region", help="AWS region; defaults to AWS_REGION or us-east-1")
     parser.add_argument("--mock", action="store_true", help="Offline fixture mode; no AWS/MCP/model calls")
     parser.add_argument("--discover-only", action="store_true", help="Connect and verify tools without AWS API/model calls")
+    parser.add_argument("--output-dir", type=Path, help="Report directory; defaults to the project's reports/")
     args = parser.parse_args(argv)
     if args.previous >= args.current:
         parser.error("--previous는 --current보다 이전 월이어야 합니다.")
     if args.mock and args.discover_only:
         parser.error("--mock과 --discover-only는 함께 사용할 수 없습니다.")
     root = Path(__file__).resolve().parent
+    output_dir = args.output_dir or root / "reports"
+    period = ReviewPeriod(args.previous, args.current)
     try:
-        hook = ReadOnlyBillingHook(load_exceptions(root / "context/exceptions.yaml"))
+        hook = ReadOnlyBillingHook(load_exceptions(root / "context/exceptions.yaml"), period=period)
     except (OSError, yaml.YAMLError, ValidationError, TypeError, ValueError) as exc:
         print(f"업무 예외 Context를 읽을 수 없습니다 ({type(exc).__name__}): {exc}", file=sys.stderr)
         return 2
     if args.mock:
         try:
-            path = run_mock(args.previous, args.current, hook, root)
+            path = run_mock(period, hook, root, output_dir)
         except (OSError, ValueError, TypeError) as exc:
             print(f"MOCK 실행 실패 ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 2
@@ -108,13 +138,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Agent 노출 tool names: {', '.join(sorted(agent.tool_names))}", file=sys.stderr)
             if args.discover_only:
                 return 0
-            result = agent(
-                review_request(args.previous, args.current), structured_output_model=ReviewAnalysis
-            )
+            result = agent(review_request(period), structured_output_model=ReviewAnalysis)
             if hook.snapshot.errors:
                 raise ValueError("; ".join(hook.snapshot.errors))
-            if not hook.snapshot.cost_comparison_raw or hook.snapshot.optimization_raw is None:
-                raise ValueError("필수 cost-comparison/cost-optimization source가 모두 수집되지 않았습니다.")
+            missing = hook.snapshot.missing_sources()
+            if missing:
+                raise ValueError("필수 조회가 성공하지 않아 리포트를 생성하지 않습니다: " + ", ".join(missing))
             if not isinstance(result.structured_output, ReviewAnalysis):
                 raise ValueError("LLM의 ReviewAnalysis structured output을 검증할 수 없습니다.")
             items = hook.snapshot.included_recommendations + hook.snapshot.excluded_recommendations
@@ -132,9 +161,9 @@ def main(argv: list[str] | None = None) -> int:
                     "리소스 변경 전 사람이 별도로 확인하세요."
                 )
             path = write_report(
-                previous=args.previous, current=args.current, mode="LIVE",
+                previous=period.previous, current=period.current, mode="LIVE",
                 analysis=result.structured_output, snapshot=hook.snapshot,
-                directory=root / "reports", prerequisites=prerequisites,
+                directory=output_dir, prerequisites=prerequisites,
             )
             print(f"LIVE report: {path}")
             print(f"included={len(hook.snapshot.included_recommendations)}, "

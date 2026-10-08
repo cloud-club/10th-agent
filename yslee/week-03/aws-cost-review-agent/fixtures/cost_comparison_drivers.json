@@ -1,0 +1,55 @@
+{
+  "fixture_version": 1,
+  "synthetic": true,
+  "operation": "getCostComparisonDrivers",
+  "previous_month": "2026-07",
+  "current_month": "2026-08",
+  "metric_for_comparison": "UnblendedCost",
+  "status": "success",
+  "data": {
+    "cost_comparison_drivers": [
+      {
+        "cost_selector": {
+          "And": [
+            {"Dimensions": {"Key": "SERVICE", "Values": ["MOCK Example Compute"]}},
+            {"Dimensions": {"Key": "USAGE_TYPE", "Values": ["MOCK-BoxUsage:example.large"]}}
+          ]
+        },
+        "metrics": {
+          "UnblendedCost": {
+            "baseline_time_period_amount": "500.0",
+            "comparison_time_period_amount": "650.0",
+            "difference": "150.0",
+            "unit": "USD"
+          }
+        },
+        "cost_drivers": [
+          {
+            "name": "MOCK usage increase",
+            "type": "USAGE_INCREASE",
+            "metrics": {
+              "UnblendedCost": {
+                "baseline_time_period_amount": "500.0",
+                "comparison_time_period_amount": "640.0",
+                "difference": "140.0",
+                "unit": "USD"
+              }
+            }
+          },
+          {
+            "name": "MOCK price change",
+            "type": "PRICE_CHANGE",
+            "metrics": {
+              "UnblendedCost": {
+                "baseline_time_period_amount": "0.0",
+                "comparison_time_period_amount": "10.0",
+                "difference": "10.0",
+                "unit": "USD"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

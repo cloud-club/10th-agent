@@ -1,10 +1,54 @@
 {
-  "fixture_version": 1,
+  "fixture_version": 2,
   "synthetic": true,
-  "current_month": "2026-08",
+  "operation": "getCostAndUsageComparisons",
   "previous_month": "2026-07",
-  "currency": "USD",
-  "services": [
-    {"name": "MOCK Example Compute", "current": 120.0, "previous": 100.0}
-  ]
+  "current_month": "2026-08",
+  "metric_for_comparison": "UnblendedCost",
+  "status": "success",
+  "data": {
+    "total_cost_and_usage": {
+      "UnblendedCost": {
+        "baseline_time_period_amount": "1000.0",
+        "comparison_time_period_amount": "1200.0",
+        "difference": "200.0",
+        "unit": "USD"
+      }
+    },
+    "cost_and_usage_comparisons": [
+      {
+        "cost_and_usage_selector": {"Dimensions": {"Key": "SERVICE", "Values": ["MOCK Example Compute"]}},
+        "metrics": {
+          "UnblendedCost": {
+            "baseline_time_period_amount": "600.0",
+            "comparison_time_period_amount": "780.0",
+            "difference": "180.0",
+            "unit": "USD"
+          }
+        }
+      },
+      {
+        "cost_and_usage_selector": {"Dimensions": {"Key": "SERVICE", "Values": ["MOCK Example Storage"]}},
+        "metrics": {
+          "UnblendedCost": {
+            "baseline_time_period_amount": "300.0",
+            "comparison_time_period_amount": "290.0",
+            "difference": "-10.0",
+            "unit": "USD"
+          }
+        }
+      },
+      {
+        "cost_and_usage_selector": {"Dimensions": {"Key": "SERVICE", "Values": ["MOCK Example Database"]}},
+        "metrics": {
+          "UnblendedCost": {
+            "baseline_time_period_amount": "100.0",
+            "comparison_time_period_amount": "130.0",
+            "difference": "30.0",
+            "unit": "USD"
+          }
+        }
+      }
+    ]
+  }
 }

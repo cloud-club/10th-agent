@@ -41,10 +41,20 @@ def test_discovery_only_closes_client_without_model_or_cost_calls(monkeypatch, c
     assert "Agent 노출 tool names: cost-comparison, cost-optimization" in capsys.readouterr().err
 
 
-def test_mock_mode_never_connects_to_mcp_or_model(monkeypatch, capsys):
+def test_mock_mode_never_connects_to_mcp_or_model(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(app, "make_billing_client", lambda *args: pytest.fail("MCP must not start"))
     monkeypatch.setattr(app, "make_agent", lambda *args, **kwargs: pytest.fail("model must not start"))
-    assert app.main(["--previous", "2026-07", "--current", "2026-08", "--mock"]) == 0
+    assert app.main(["--previous", "2026-07", "--current", "2026-08", "--mock", "--output-dir", str(tmp_path)]) == 0
     output = capsys.readouterr().out
     assert "MOCK report:" in output
     assert "included=3, excluded=2" in output
+    text = (tmp_path / "cost_review_2026-08.md").read_text(encoding="utf-8")
+    assert "mode: MOCK" in text and "## 월간 비용 비교" in text
+    assert "| UnblendedCost | 1000.0 | 1200.0 | 200.0 | USD |" in text
+    assert "MOCK usage increase" in text
+
+
+def test_mock_mode_rejects_other_months(capsys, tmp_path):
+    assert app.main(["--previous", "2026-06", "--current", "2026-07", "--mock", "--output-dir", str(tmp_path)]) == 2
+    assert "비교 월이 CLI 입력과 다릅니다" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []

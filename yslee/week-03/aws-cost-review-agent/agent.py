@@ -9,13 +9,19 @@ from strands.models import BedrockModel
 
 from billing_mcp import ALLOWED_TOOLS
 from hooks import ReadOnlyBillingHook
+from models import ReviewPeriod
 
 SYSTEM_PROMPT = """You are a read-only AWS cost review assistant. Follow these rules:
 1. For a monthly review call only the two supplied Billing MCP tools.
-2. Use cost-comparison for the requested month-to-month cost comparison and major cost drivers.
+2. Use cost-comparison exactly twice: operation=getCostAndUsageComparisons for the month-to-month
+   comparison and operation=getCostComparisonDrivers for the major cost drivers. Use exactly the
+   baseline/comparison dates given in the request (first day of the month to the first day of the
+   next month) and the metric_for_comparison named there. Python cancels calls with other dates;
+   if a call is cancelled, retry once with the dates from the cancellation message.
 3. Use cost-optimization only with operation=list_recommendations from Cost Optimization Hub.
 4. Never calculate, infer, or invent costs or savings that AWS did not return.
-   Do not put standalone numbers or monetary amounts in your narrative; Python renders numeric tables.
+   Do not write monetary amounts in your narrative; Python renders numeric tables from the source.
+   You may name months such as 2026-07.
 5. Python has already applied exact business exclusions to the cost-optimization result.
    Do not reclassify, add, or remove recommendations. Do not transform source fields.
 6. Never claim an AWS resource or account setting was changed. Recommendations are proposals;
@@ -70,12 +76,15 @@ def make_agent(
     return agent
 
 
-def review_request(previous: str, current: str) -> str:
-    """Ask for one review; the hook enforces a bounded read-only tool budget."""
+def review_request(period: ReviewPeriod) -> str:
+    """Ask for one review; the hook enforces the period and a bounded read-only tool budget."""
+    dates = ", ".join(f"{key}={value}" for key, value in period.tool_dates().items())
     return (
-        f"{previous}와 {current}의 AWS 월간 비용을 비교하고 주요 cost driver와 "
+        f"{period.previous}와 {period.current}의 AWS 월간 비용을 비교하고 주요 cost driver와 "
         "Cost Optimization Hub의 list_recommendations 권고를 요약하세요. "
-        "두 달 모두 월 전체 기간(월 1일~다음 달 1일)을 사용하세요. "
+        f"cost-comparison은 {dates}, metric_for_comparison=UnblendedCost로 "
+        "operation=getCostAndUsageComparisons(group_by='[{\"Type\": \"DIMENSION\", \"Key\": \"SERVICE\"}]')와 "
+        "operation=getCostComparisonDrivers를 각각 정확히 한 번 호출하세요. "
         "Python이 적용한 업무 예외 결과를 재판단하지 마세요. 금액·리소스 표는 만들지 말고 "
         "비용 변화와 검토 우선순위, 한계만 서술하세요."
     )
