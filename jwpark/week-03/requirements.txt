@@ -3,6 +3,9 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
 attrs==26.1.0
+awscrt==0.36.0
+boto3==1.43.110
+botocore==1.43.110
 certifi==2026.7.22
 cffi==2.1.1
 click==8.5.0
@@ -18,6 +21,7 @@ httpx2==2.13.1
 huggingface_hub==1.32.0
 idna==3.20
 Jinja2==3.1.6
+jmespath==1.1.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 markdown-it-py==4.2.0
@@ -36,15 +40,18 @@ pydantic==2.13.5
 pydantic_core==2.46.5
 Pygments==2.21.0
 PyJWT==2.15.0
+python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 PyYAML==6.0.3
 referencing==0.37.0
 regex==2026.9.10
 rich==15.0.0
 rpds-py==2026.6.3
+s3transfer==0.19.2
 safetensors==0.8.0
 setuptools==84.0.0
 shellingham==1.5.4
+six==1.17.0
 sse-starlette==3.4.11
 starlette==1.7.0
 sympy==1.14.0
@@ -56,4 +63,5 @@ truststore==0.10.4
 typer==0.27.2
 typing-inspection==0.4.4
 typing_extensions==4.16.0
+urllib3==2.8.0
 uvicorn==0.54.0

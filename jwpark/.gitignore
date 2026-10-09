@@ -1,0 +1,48 @@
+# 가상환경 (torch 등 수백 MB, libtorch_cpu.dylib 단일 파일만 368MB)
+.venv/
+venv/
+env/
+
+# Python 빌드/캐시 산출물
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 모델 가중치 / 대용량 바이너리 (GitHub 100MB 제한)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+*.h5
+*.dylib
+*.so
+*.dll
+
+# Hugging Face / 모델 캐시를 프로젝트 안에 둔 경우
+.cache/
+models/
+checkpoints/
+
+# 대용량 데이터 / 압축 파일
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.parquet
+
+# 자격 증명 / 로컬 설정
+.env
+.aws/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
