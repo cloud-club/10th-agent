@@ -1,0 +1,7 @@
+{
+  "source": "수기 입력 — 인사·그룹웨어 조직 정보와 맞출 자리(agent/store.py의 load_org)",
+  "members": [
+    { "id": "E001", "name": "김도현", "org": "영업", "position": "", "email": "", "phone": "" },
+    { "id": "E002", "name": "박성민", "org": "기술컨설팅", "position": "", "email": "", "phone": "" }
+  ]
+}
