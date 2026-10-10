@@ -1,0 +1,36 @@
+{
+  "no": 3,
+  "date": "2026-10-02",
+  "time": "21:30",
+  "type": "방문(야간 현장 테스트 후 회의)",
+  "place": "한빛정밀 창원공장 검사실",
+  "attendees": [
+    "정수연",
+    "이재훈",
+    "박성민",
+    "김도현"
+  ],
+  "minutes": {
+    "status": "확정",
+    "confirmed_by": "(게이트 도입 전 처리분 · 사람 확정 아님)",
+    "confirmed_at": ""
+  },
+  "changes": [
+    {
+      "kind": "requirement",
+      "key": "R3",
+      "label": "핵심 요구사항",
+      "action": "신규",
+      "value": "검사 속도 문서 제공"
+    },
+    {
+      "kind": "stakeholder",
+      "key": "이재훈",
+      "label": "이해관계자",
+      "action": "변경",
+      "value": "이재훈 — 영향자 · 사용자"
+    }
+  ],
+  "scope": "외부",
+  "참고 사진": []
+}
