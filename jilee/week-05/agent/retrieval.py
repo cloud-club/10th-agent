@@ -2,7 +2,7 @@
 
 검색 순서
   1. 메타데이터 필터   : 프로젝트·회차 범위·조각 종류로 후보를 먼저 좁힌다(다른 프로젝트가 섞이지 않는다)
-  2. 검색기 여러 개    : BM25(키워드, 한글 2글자 조각) — 벡터 검색은 VECTOR_RETRIEVER 자리에 끼운다
+  2. 검색기 여러 개    : BM25(키워드, 한글 2글자 조각) + 임베딩(뜻). 임베딩 키(EMBED_API_KEY)가 없으면 BM25만 쓴다
   3. RRF              : 검색기마다 다른 점수 대신 순위만 합친다. 1/(60+순위)의 합
   4. 앞뒤 발화 붙이기  : 찾은 발화 앞뒤 WINDOW개를 함께 돌려준다("이십이일까지"가 무엇에 대한 답인지 보이게)
   5. 최신성 표시       : 조각의 회차가 프로젝트 기억의 최신 회차보다 앞서면 "현재 사실은 프로젝트 기억 기준"을 붙인다
@@ -19,11 +19,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
-from . import memory
+from . import embed, memory
 
 RRF_K = 60
 WINDOW = 2
-VECTOR_RETRIEVER: Callable[[str, list[dict]], list[str]] | None = None  # (질문, 후보 조각) → 조각 id 순위. 임베딩 붙일 자리
+VECTOR_RETRIEVER: Callable[[str, list[dict]], list[str]] | None = None  # (질문, 후보 조각) → 조각 id 순위. 비워 두면 embed.rank(키가 있을 때)
 
 _UTTER = re.compile(r"^([가-힣]{2,4})\s*:\s*(.+)$")
 _HEAD_DATE = re.compile(r"^\[(\d{4}-\d{2}-\d{2})")
@@ -142,8 +142,11 @@ def search(deal_id: str, deal_dir: Path, minutes_dir: Path, query: str, meeting_
     if speakers:  # 질문에 인물이 있으면 그 사람의 발화만 따로 순위를 매겨 RRF로 합친다
         mine = {c["id"] for c in cand if c["speaker"] in speakers}
         rankings.append([i for i in rankings[0] if i in mine])
-    if VECTOR_RETRIEVER is not None:
-        rankings.append([i for i in VECTOR_RETRIEVER(query, cand) if i in allowed])
+    vector = VECTOR_RETRIEVER or (embed.rank if embed.enabled() else None)
+    if vector is not None:
+        ranked = [i for i in vector(query, cand) if i in allowed]
+        if ranked:  # 호출이 실패하면 빈 순위가 온다. 그때는 키워드만으로 답한다
+            rankings.append(ranked)
     by_id = {c["id"]: c for c in chunks}
     out = []
     for i in rrf(rankings)[:top_k]:

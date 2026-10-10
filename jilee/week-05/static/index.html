@@ -790,7 +790,7 @@
             <tr><td><code>GET /api/sheet?customer_id=&amp;project_id=</code></td><td>결과지: 항목별 값·근거·상태·이력, 담당자와 연락처, 거래 조건, 완결성</td></tr>
             <tr><td><code>GET /api/graph?customer_id=&amp;project_id=</code></td><td>노드와 선(일의 흐름 · 관계)</td></tr>
             <tr><td><code>POST /api/run</code></td><td><code>{"customer_id","project_id","meeting_no","transcript"}</code> 녹취를 넣고 에이전트 실행(진행 단계가 SSE로 내려옴)</td></tr>
-            <tr><td><code>POST /api/minutes/confirm</code></td><td>회의록 확정 → 결과지에 AI 초안으로 반영</td></tr>
+            <tr><td><code>POST /api/minutes/confirm</code></td><td>회의록 초안을 반영(<code>/api/run</code>은 끝나면 스스로 반영하므로 따로 부를 일이 없음)</td></tr>
             <tr><td><code>POST /api/minutes/edit</code></td><td><code>{"markdown"}</code> 회의록 초안을 사람이 고쳐 저장</td></tr>
             <tr><td><code>POST /api/sheet/confirm</code></td><td><code>{"kind","target"}</code> 결과지 값 확인</td></tr>
             <tr><td><code>POST /api/file?…&amp;name=</code></td><td>첨부파일 올리기(본문이 파일). <code>GET /api/files</code>로 목록, <code>GET /api/file</code>로 내려받기</td></tr>

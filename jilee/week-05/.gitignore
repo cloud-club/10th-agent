@@ -9,3 +9,5 @@ runs/
 design-qa.md
 # 회사 로고 그림은 올리지 않는다(없으면 화면이 글자로 보인다)
 static/interx-logo-white.png
+# 임베딩 벡터(다시 만들 수 있다)
+.cache/

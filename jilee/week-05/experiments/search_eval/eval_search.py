@@ -7,7 +7,9 @@
 비교
   word     : 띄어쓰기 단어 그대로 색인(조사가 붙으면 다른 단어가 됨)
   bigram   : 한글을 2글자 조각으로 잘라 색인(현재 방식)
-  bigram+RRF(word) : 두 색인의 순위를 RRF로 합침 — 벡터 검색을 붙일 때와 같은 결합 경로
+  bigram+RRF(word) : 두 색인의 순위를 RRF로 합침
+  vector   : 임베딩 코사인 유사도만(EMBED_API_KEY가 있을 때)
+  bigram+RRF(vector) : 키워드와 임베딩 순위를 RRF로 합침(현재 방식, 키가 있을 때)
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from agent import retrieval  # noqa: E402
+from agent import embed, retrieval  # noqa: E402
 
 DEAL = ROOT / "customers" / "KR0001" / "projects" / "P001"
 QUESTIONS = json.loads((Path(__file__).parent / "questions.json").read_text(encoding="utf-8"))
@@ -69,6 +71,12 @@ def main() -> None:
         "bigram": lambda q: [by_id[i] for i in rank_bigram(q)],
         "bigram+RRF(word)": lambda q: [by_id[i] for i in retrieval.rrf([rank_bigram(q), rank_word(q)])],
     }
+    if embed.enabled():
+        rank_vector = lambda q: embed.rank(q, chunks)
+        variants["vector"] = lambda q: [by_id[i] for i in rank_vector(q)]
+        variants["bigram+RRF(vector)"] = lambda q: [by_id[i] for i in retrieval.rrf([r for r in (rank_bigram(q), rank_vector(q)) if r])]
+    else:
+        print("EMBED_API_KEY가 없어 임베딩 변형은 건너뜁니다.")
     print(f"발화 조각 {len(chunks)}개 · 질문 {len(QUESTIONS)}개")
     results = {}
     for name, fn in variants.items():
@@ -77,6 +85,8 @@ def main() -> None:
         print(f"\n[{name}] Recall@5 {r['Recall@5']:.3f} · MRR {r['MRR']:.3f}")
         for m in r["놓친 질문"]:
             print("  놓침:", m)
+    if embed.last_error:
+        print("\n임베딩 호출 실패:", embed.last_error)
     (Path(__file__).parent / "result.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 

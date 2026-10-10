@@ -291,7 +291,7 @@ def tidy_minutes(markdown: str) -> str:
 
 
 def save_minutes(customer_id: str, project_id: str, meeting_no: int, markdown: str) -> str:
-    """규칙 검사를 통과한 회의록을 초안으로 저장한다. 담당자가 회의록을 확정해야 프로젝트 기억과 결과지에 반영된다."""
+    """규칙 검사를 통과한 회의록을 초안으로 저장한다. confirm_minutes가 불려야 프로젝트 기억과 결과지에 반영된다(앱은 실행 직후 부른다)."""
     d, key = _project(customer_id, project_id)
     n = int(meeting_no)
     markdown = tidy_minutes(markdown)
@@ -310,7 +310,7 @@ def save_minutes(customer_id: str, project_id: str, meeting_no: int, markdown: s
     p.write_text(markdown.strip() + "\n", encoding="utf-8")
     (d / "state" / f"minutes_{n:02d}.agent.md").unlink(missing_ok=True)  # 사람이 고치기 전 원문(edit.py)은 새 초안과 맞지 않는다
     st = memory.update_state(prev, markdown, n, pending)
-    memory._write_json(memory.draft_path(d, n), st)  # 두 번째 게이트 앞에서 기다린다
+    memory._write_json(memory.draft_path(d, n), st)  # confirm_minutes가 불릴 때까지 초안으로 둔다
     memory.pending_path(d, n).unlink(missing_ok=True)
     m = store.load_meeting(customer_id, project_id, n)
     m["minutes"], m["changes"] = {"status": "초안"}, sheet.diff(prev["sheet"], st["sheet"])
@@ -432,7 +432,8 @@ GATE_STEPS = {"예정": 0, "녹취 확보": 1, "회의록 검토": 1, "결과지
 def gate_of(customer_id: str, project_id: str, meeting_no: int) -> dict:
     """회의 한 건이 세 문 가운데 어디에 서 있는가.
 
-    ① 회의: 녹취가 있다  ② 회의록: 담당자가 초안을 확정했다  ③ 결과지: 이 회의가 넣은 값을 모두 확인했다
+    ① 회의: 녹취가 있다  ② 회의록: 초안이 반영됐다  ③ 결과지: 이 회의가 넣은 값을 모두 확인했다
+    '회의록 검토'는 초안이 반영되기 전의 상태다. 앱은 실행 직후 반영하므로 터미널에서 --confirm 없이 돌렸을 때만 머문다.
     """
     d, key = _project(customer_id, project_id)
     n, pending = int(meeting_no), 0
@@ -451,7 +452,7 @@ def gate_of(customer_id: str, project_id: str, meeting_no: int) -> dict:
 
 
 def check_gate(customer_id: str, project_id: str, meeting_no: int) -> None:
-    """앞선 회의의 회의록이 확정되지 않았으면 다음 회의를 처리하지 않는다(확정되지 않은 내용 위에 쌓지 않는다)."""
+    """앞선 회의가 반영되지 않았으면(원문은 있는데 state가 없으면) 다음 회의를 처리하지 않는다(반영되지 않은 내용 위에 쌓지 않는다)."""
     d, _ = _project(customer_id, project_id)
     for m in store.meeting_nos(customer_id, project_id):
         if m < int(meeting_no) and store.transcript_path(customer_id, project_id, m).exists() and not memory.state_path(d, m).exists():
@@ -459,7 +460,8 @@ def check_gate(customer_id: str, project_id: str, meeting_no: int) -> None:
 
 
 def confirm_minutes(customer_id: str, project_id: str, meeting_no: int, who: str = "담당자") -> dict:
-    """담당자가 회의록을 확정한다. 이때 비로소 프로젝트 기억이 갱신되고, 결과지 변경이 AI 초안으로 들어간다."""
+    """회의록 초안을 반영한다. 이때 프로젝트 기억이 갱신되고, 결과지 변경이 AI 초안으로 들어간다.
+    사람이 누르는 확정 단계는 없앴고, 앱이 실행 직후 who="자동 반영"으로 부른다(터미널은 --confirm)."""
     d, _ = _project(customer_id, project_id)
     n = int(meeting_no)
     st = memory._read_json(memory.draft_path(d, n))
