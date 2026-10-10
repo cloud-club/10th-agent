@@ -1,127 +1,64 @@
 # AWS Cost Review Agent
 
-매월 반복되는 AWS 비용 리뷰 작업을 줄이는 읽기 전용 Python 에이전트다. 두 달을 지정하면 AWS Billing and Cost Management MCP Server를 통해 월간 비용 비교, 주요 cost driver, Cost Optimization Hub 권고를 가져오고, 팀의 업무 예외를 YAML 규칙으로 걸러낸 뒤, LLM이 설명을 붙인 Markdown 리포트를 만든다. 결과는 사람이 검토할 제안이며 에이전트는 AWS를 변경하지 않는다.
+매달 반복하는 AWS 비용 리뷰를 줄이기 위해 만든 Python 에이전트다.
 
-## 1. 문제와 목표
+### [동작 방식]
+비교할 두 달을 입력하면 AWS Billing MCP에서 비용 변화와 주요 증가·감소 요인(cost driver), 최적화 권고를 가져와 Markdown 리포트로 정리한다.
 
-비용 리뷰어는 매월 Cost Explorer에서 전월 대비 변화를 확인하고, Cost Optimization Hub 권고를 열어 보고, "월말 배치용 서버는 유지" 같은 운영 예외를 손으로 다시 걸러낸다. 이 MVP는 그 반복을 한 번의 실행으로 줄인다.
+### [배경]
+비용 절감 권고가 있어도 월말 배치 때문에 서버 사양을 유지해야 하는 경우가 있다. 이런 업무 예외를 YAML에 적어 두고, Python이 리소스 ID와 태그를 정확히 비교해 권고를 걸러낸다. LLM은 조회 결과에 대한 설명을 작성하고, 금액과 비율이 들어가는 표는 Python이 원본 응답에서 만든다.
 
-지키는 경계:
+**읽기 전용이다.** (AWS 설정이나 리소스를 변경하지 않으며, 권고를 적용할지는 사람이 결정)
 
-- 읽기 전용 분석이다. 권고의 적용 여부는 사람이 결정한다.
-- 업무 예외의 정확 일치 판정과 모든 수치 표는 Python이 담당한다.
-- LLM은 근거를 설명만 하고 비용·절감액·원인을 지어내지 않는다.
-- RAG, 메모리, 다중 에이전트는 필요가 증명되기 전까지 넣지 않는다.
-
-## 2. 동작 흐름
+## 동작 방식
 
 ```text
-python app.py --previous 2026-08 --current 2026-09
-   │
-   ├─ 1) context/exceptions.yaml 로드 (Pydantic 검증, 미지원 규칙은 거부)
-   ├─ 2) Billing MCP 서버 기동 (uvx) → tool 이름 발견·검증 → cost-comparison, cost-optimization만 노출
-   ├─ 3) Strands Agent 실행 (Bedrock 모델)
-   │       cost-comparison  getCostAndUsageComparisons ┐ BeforeToolCallEvent: 기간·metric·횟수 검사
-   │       cost-comparison  getCostComparisonDrivers   ┘ AfterToolCallEvent: 응답 형식 검증 후 snapshot 보관
-   │       cost-optimization list_recommendations      → AfterToolCallEvent: Python이 업무 예외 적용 후
-   │                                                     필터된 결과만 모델에 전달
-   │       ReviewAnalysis (structured output)          → 금액 없는 서술만 허용
-   ├─ 4) 완료 검증: 세 조회가 모두 성공했는지 확인 (아니면 exit 2, 리포트 미생성)
-   └─ 5) Python Markdown 렌더링 → reports/cost_review_2026-09.md
+비교할 두 달 입력
+  → Strands Agent + Bedrock
+  → Billing MCP로 비용 비교·cost driver·최적화 권고 조회
+  → Python이 응답 검증과 업무 예외 적용
+  → LLM이 설명 작성
+  → Python이 수치 표와 설명을 합쳐 Markdown 리포트 저장
 ```
 
-`--mock`은 AWS, MCP, 모델을 전혀 호출하지 않고 `fixtures/`의 합성 데이터를 같은 요청 검증·필터·렌더링 경로로 통과시킨다. `--discover-only`는 MCP 연결과 tool 이름 검증까지만 수행한다.
+Agent에는 `cost-comparison`과 `cost-optimization` 두 도구만 제공한다. 비용 비교와 cost driver 조회는 각각 한 번, 최적화 권고 조회도 한 번만 허용한다. 비교 기간이 입력한 월과 다르면 호출을 취소하고, 필요한 세 조회가 모두 성공해야 리포트를 생성한다.
 
-## 3. 역할 분담
+업무 예외는 [context/exceptions.yaml](context/exceptions.yaml)에 둔다. 리소스 ID 규칙을 먼저 적용하고, 해당 규칙이 없으면 태그 key/value를 확인한다. 제외된 권고도 리포트에 사유와 함께 남긴다. 저장소의 리소스 ID는 예제 값이다.
 
-| 작업 | 담당 | 근거 위치 |
-|---|---|---|
-| 조회 기간을 요청한 두 달의 1일~익월 1일로 고정 | Python hook | `hooks.py` `accept_comparison_request` |
-| tool·operation 허용 목록, 호출 횟수 제한 | Python hook | `billing_mcp.py`, `hooks.py` |
-| 업무 예외 적용 (resource ID·tag 정확 일치) | Python | `filters.py` |
-| 비용 비교 표, 권고 표의 모든 수치 | Python (source 값 복사) | `comparison.py`, `report.py` |
-| 비용 변화 설명, 검토 우선순위 서술, 한계 서술 | LLM | `agent.py`, `models.py` `ReviewAnalysis` |
-| 권고 적용 여부 결정 | 사람 | 리포트 |
+## 현재까지 한 작업 (~W5)
 
-LLM이 보는 데이터도 Python이 먼저 거른다. 권고 목록은 업무 예외를 적용한 `included/excluded` 형태로만 모델에 전달되고, 모델은 이를 재분류하지 말라는 지시를 받는다. 비용 비교 응답은 원본 그대로 모델에 전달되지만 수치 표는 모델 출력이 아니라 snapshot에서 렌더링한다.
+월간 리뷰에 필요한 MVP 기능은 구현했다. 구현 내용은 `5주차` 커밋(`a4542f8`)에 반영되어 있다.
 
-## 4. 구성 요소
+- 전월·당월 비용, 항목별 변화, 주요 cost driver를 보여주는 비교 표
+- 조회 기간 검증, 허용 도구·작업과 호출 횟수 제한
+- 필수 조회의 성공 여부를 확인하는 완료 검증
+- YAML 업무 예외 필터와 제외 사유 표시
+- LLM 설명의 금액 표기를 검사하는 출력 검증기
+- live 실행 전 계정·권한·모델 접근을 확인하는 `check_readiness.py`
 
-| 파일 | 역할 |
-|---|---|
-| `app.py` | CLI 진입점. 인자 검증, mock/discover-only/live 분기, 완료 검증, 리포트 저장 |
-| `agent.py` | Strands Agent 생성(Bedrock), system prompt, 리뷰 요청문 |
-| `billing_mcp.py` | Billing MCP stdio 연결, tool 이름 발견·검증, 허용 목록 필터 |
-| `hooks.py` | BeforeToolCallEvent 가드(기간·metric·횟수), AfterToolCallEvent 처리(검증·필터·snapshot), 완료 판정 |
-| `filters.py` | 권고 응답 파싱, 업무 예외 정확 일치, 절감액 내림차순 정렬 |
-| `comparison.py` | cost-comparison 응답 형식 검증, 표 행 추출, selector 라벨 |
-| `models.py` | 예외 규칙 모델, `ReviewPeriod`(월 경계 계산), `ReviewAnalysis`(금액 금지 검증) |
-| `report.py` | Markdown 리포트 렌더링 |
-| `check_readiness.py` | live 실행 전 읽기 전용 사전 점검 |
-| `context/exceptions.yaml` | 팀 업무 예외 규칙 |
-| `fixtures/` | mock용 합성 데이터 (서버 응답 형식) |
-| `tests/` | 오프라인 테스트 (AWS 호출 없음) |
+오프라인 테스트 **36개가 통과**했다. 잘못된 기간의 호출을 취소한 뒤 다시 시도하는 흐름, 필수 조회가 빠졌을 때 리포트를 만들지 않는 동작, 원본 수치와 제외 사유가 리포트에 남는지를 확인했다.
 
-의존성은 `strands-agents`, `mcp`, `boto3`, `pydantic`, `pyyaml`이며 Python 3.10 이상이 필요하다. MCP 서버는 `uvx awslabs.billing-cost-management-mcp-server@latest`로 실행한다.
+| 검증 항목 | 현재 상태 |
+| --- | --- |
+| 실제 MCP 서버 연결과 도구 목록 조회 | 확인 |
+| 샘플 데이터로 예외 처리와 리포트 생성 | 확인 |
+| Strands 이벤트 루프 | 가짜 모델·도구를 사용한 오프라인 테스트로 확인 |
+| 실제 AWS 데이터와 실제 Bedrock 모델을 함께 사용하는 전체 실행 | 아직 미완료 |
 
-## 5. 업무 예외 Context
+`--mock`은 AWS·MCP·LLM을 호출하지 않는다. 합성 데이터와 고정 설명을 사용한다. Strands 루프 테스트도 모델 응답을 미리 지정해 실행하므로, 실제 LLM의 판단이나 설명 정확도까지 검증한 것은 아니다.
 
-`context/exceptions.yaml`은 두 종류의 `exclude` 규칙만 지원한다.
+## 남은 작업 (~W5)
 
-```yaml
-resources:
-  - resource_id: i-example-batch
-    action: exclude
-    reason: 월말 배치 처리를 위해 현재 사양 유지
-tag_rules:
-  - key: OptimizationExempt
-    value: "true"
-    action: exclude
-    reason: 비용 최적화 제외 태그
-```
+현재는 Bedrock 모델 호출에서 `Error 002`가 발생해 첫 live 실행을 끝내지 못했다. 계정 접근 문제와 서비스 준비 상태를 먼저 확인해야 한다.
 
-- resource ID 규칙을 먼저 보고, 없으면 tag key/value 규칙을 본다. 모두 대소문자까지 정확 일치다.
-- 지원하지 않는 키나 `exclude` 외의 action은 로드 단계에서 거부한다(exit 2). fuzzy 매칭이나 LLM의 예외 판단은 없다.
-- 제외된 권고는 리포트의 별도 표에 사유와 함께 남는다.
-- 실제 계정의 리소스 ID를 Git에 커밋하지 않는다. 저장소의 ID는 모두 example이다.
+1. **Bedrock 접근 문제 해결**: AWS Support를 통해 `Error 002`의 계정 제한을 확인한다. 계정 플랜이 사용하려는 추론 방식을 지원하는지도 확인하고, 필요하면 모델 설정이나 플랜을 조정한다.
+2. **비용 데이터와 권고 준비**: Cost Explorer와 Cost Optimization Hub를 활성화하고 데이터가 들어오는지 확인한다. Cost Explorer의 당월 데이터는 약 24시간, 과거 데이터는 며칠 더 걸릴 수 있다. Cost Optimization Hub의 권고 수집은 최대 24시간이 걸릴 수 있다. Compute Optimizer 기반 권고가 필요하면 해당 서비스도 등록한다.
+3. **모델 접근 준비**: Anthropic 모델을 사용하려면 use case form을 제출하고 모델 사용 가능 상태를 확인한다. 제출 후에도 계약 상태가 대기 중일 수 있다.
+4. **사전 점검 후 live 실행**: 점검의 실패 항목을 해결하고, 경고와 생략된 항목도 확인한다. 실제 Cost Explorer 조회와 모델 호출이 성공하면 리뷰를 실행하고, 같은 기간·metric·필터로 조회한 AWS 콘솔 값과 리포트를 대조한다.
 
-## 6. Tool 호출 가드
+## 실행
 
-연결 시 서버가 실제로 제공하는 tool 이름을 확인하고 Strands `MCPClient`의 `tool_filters.allowed`로 `cost-comparison`, `cost-optimization`만 Agent에 노출한다. Agent의 tool 목록이 허용 목록과 다르면 실행을 중단한다.
-
-Hook이 코드로 강제하는 규칙:
-
-- `cost-comparison`은 `getCostAndUsageComparisons`와 `getCostComparisonDrivers`를 각각 최대 한 번 호출한다.
-- 네 날짜 인자가 `--previous`/`--current`의 1일~익월 1일(YYYY-MM-DD)과 정확히 같아야 한다. 다르면 호출을 취소하고 올바른 값을 취소 메시지로 돌려주어 모델이 재시도하게 한다. 취소된 호출은 호출 예산을 소비하지 않는다.
-- `metric_for_comparison`은 문자열로 지정해야 하며, 기록해서 리포트의 실행 정보에 표시한다. 요청문은 `UnblendedCost`와 SERVICE 기준 group_by를 제안하지만 값 자체를 강제하지는 않는다.
-- `cost-optimization`은 `list_recommendations`만 최대 한 번 호출한다. 그 외 operation은 취소한다.
-- 응답이 서버 형식(`{"status": "success", "data": {...}}`)이 아니거나 오류 상태면 기록 후 실패로 처리한다. 잘못된 데이터를 모델이나 리포트에 넘기지 않는다.
-- LIVE 리포트는 두 비교 작업과 `list_recommendations`가 모두 성공해야 생성된다. 하나라도 없으면 누락 항목을 출력하고 exit 2로 끝나며 파일을 만들지 않는다.
-
-MCP 호출 한 번이 AWS 요청 한 번은 아니다. 서버가 내부에서 페이지를 반복 조회하므로 Cost Explorer 요청은 여러 건이 될 수 있고, 요청마다 과금된다.
-
-## 7. 안전 원칙
-
-- AWS 리소스, IAM, 계정 설정을 변경하지 않으며 Savings Plans나 RI를 구매하지 않는다. 호출하는 API는 `ce:GetCostAndUsageComparisons`, `ce:GetCostComparisonDrivers`, `cost-optimization-hub:ListRecommendations`와 Bedrock 모델 호출뿐이다.
-- Cost Explorer나 Cost Optimization Hub를 자동으로 활성화하지 않는다.
-- AWS가 반환하지 않은 금액을 계산하거나 생성하지 않는다. `ReviewAnalysis`는 통화 표기가 붙은 숫자(`USD 120`, `$120`, `120달러`)와 소수점·천 단위 구분이 있는 숫자(`140.0`, `1,200`)를 거부하고, `2026-07`, `8월` 같은 월 표기는 허용한다. 검증에 실패하면 모델에 오류를 돌려주고 재시도시킨다.
-- 모든 표는 Python이 source snapshot의 값을 그대로 옮겨 만든다. 비율이나 합계를 새로 계산하지 않는다.
-- Credential, account ID, token을 코드나 Git에 기록하지 않는다. source snapshot은 실행 중 메모리에만 있고 원본 응답 파일을 남기지 않는다.
-
-## 8. 리포트 구성
-
-`reports/cost_review_<current>.md` (또는 `--output-dir`)에 저장한다. 같은 월은 덮어쓴다.
-
-1. 실행 정보: 비교 월, 현재 월, mode(LIVE/MOCK)
-2. 비용 변화 요약: LLM 서술
-3. 월간 비용 비교: 비교 기간과 metric, 총 비용 표, 항목별 변화 표(|difference| 내림차순 상위 20건, 생략 건수 표기), 주요 cost driver 표(AWS 반환 순서)
-4. 검토할 비용 최적화 후보: 절감액 내림차순, 절감액 없는 항목은 뒤에
-5. 업무 예외로 제외된 권고: 사유 포함
-6. 분석: LLM의 검토 우선순위 서술
-7. 한계 및 주의사항: LLM 서술 + 응답에 없던 필드(N/A) 안내 + 처리 오류
-8. 데이터 출처
-
-## 9. 설치
+Python 3.10 이상이 필요하다. 프로젝트 디렉터리에서 설치한다.
 
 ```sh
 python3 -m venv .venv
@@ -130,71 +67,52 @@ python -m pip install -e '.[dev]'
 python -m pip install uv
 ```
 
-`uv`는 MCP 서버 실행용이며 서버 패키지를 프로젝트 의존성에 넣지 않는다. mock 실행에는 AWS CLI나 자격증명이 필요 없다.
-
-## 10. 실행
-
-| 옵션 | 설명 |
-|---|---|
-| `--previous YYYY-MM`, `--current YYYY-MM` | 필수. previous가 current보다 이전 월이어야 한다 |
-| `--mock` | fixture로 오프라인 실행 (2026-07/2026-08 전용) |
-| `--discover-only` | MCP 연결과 tool 이름 검증만 수행, AWS API·모델 호출 없음 |
-| `--profile`, `--region` | AWS profile과 Bedrock region. region 기본값은 `AWS_REGION` 또는 `us-east-1` |
-| `--output-dir DIR` | 리포트 디렉터리. 기본값 `reports/` |
-
-환경변수: `MODEL_ID`(미지정 시 Strands 기본 Bedrock 모델), `AWS_PROFILE`, `AWS_REGION`. Cost Explorer와 Cost Optimization Hub는 서버가 항상 `us-east-1`로 호출하므로 `--region`은 Bedrock에만 적용된다.
+샘플 데이터로 실행하려면 다음 명령을 사용한다. fixture는 2026년 7월과 8월 비교용이다.
 
 ```sh
-# mock
 python app.py --previous 2026-07 --current 2026-08 --mock
-
-# MCP 연결만 확인
-python app.py --previous 2026-08 --current 2026-09 --discover-only
-
-# live (완료된 최근 두 달 권장)
-python app.py --previous 2026-08 --current 2026-09 --profile <AWS_PROFILE> --region us-east-1
 ```
 
-종료 코드는 성공 0, 설정·검증·조회 실패 2다. live 실행 전제: Cost Explorer 활성화, Cost Optimization Hub opt-in, Bedrock 모델 접근, 위 세 API와 `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream` 권한. 비교 월은 최근 13개월 안이어야 한다.
+리포트는 `reports/cost_review_2026-08.md`에 저장된다. 다른 디렉터리에 저장하려면 `--output-dir`을 지정한다. 같은 디렉터리에서 같은 현재 월로 다시 실행하면 기존 파일을 덮어쓴다.
 
-## 11. 사전 점검
-
-`check_readiness.py`는 live 전에 자격증명, IAM 권한(policy simulation), Cost Optimization Hub 등록, Compute Optimizer 등록, Bedrock 모델 접근을 읽기 전용으로 점검한다. 기본 실행은 무료 API만 호출한다.
+MCP 연결과 도구 목록만 확인하려면:
 
 ```sh
-python check_readiness.py --profile <AWS_PROFILE> --region us-east-1
+python app.py --previous 2026-08 --current 2026-09 --discover-only
 ```
 
-`--ce --previous YYYY-MM --current YYYY-MM`은 Cost Explorer 비교 요청 1건(약 USD 0.01)으로 활성화와 기간을 확인하고, `--invoke`는 짧은 Bedrock Converse 요청 1건으로 모델 호출을 확인한다. `--dry-run`은 네트워크 없이 boto3 API 존재만 본다. 줄마다 `OK`/`WARN`/`SKIP`/`FAIL`을 출력하고 FAIL이 있으면 exit 1이다.
+사전 점검은 사용할 AWS profile로 실행한다. 아래의 `YOUR_AWS_PROFILE`은 실제 profile 이름으로 바꾼다.
 
-## 12. 테스트
+```sh
+python check_readiness.py --profile YOUR_AWS_PROFILE --region us-east-1
+```
+
+기본 점검은 실제 Cost Explorer 비교 조회와 Bedrock 모델 호출을 생략한다. 두 항목까지 확인하려면 `--ce`와 `--invoke`를 추가한다. 이 요청에는 API·모델 사용 비용이 발생한다.
+
+```sh
+python check_readiness.py --profile YOUR_AWS_PROFILE --region us-east-1 \
+  --ce --previous 2026-08 --current 2026-09 --invoke
+```
+
+점검이 끝나면 같은 profile과 모델 설정으로 live 리뷰를 실행한다.
+
+```sh
+python app.py --previous 2026-08 --current 2026-09 \
+  --profile YOUR_AWS_PROFILE --region us-east-1
+```
+
+`MODEL_ID`로 Bedrock 모델을 지정할 수 있다. 지정하지 않으면 Strands 기본 모델을 사용한다. 자격증명은 AWS 기본 credential chain을 사용하며, `--profile` 대신 `AWS_PROFILE`을 설정해도 된다.
+
+테스트:
 
 ```sh
 pytest -q
 ```
 
-모두 오프라인이며 AWS를 호출하지 않고 `tmp_path`에만 기록한다. 검증 범위:
+## 아직 확인할 부분
 
-- 업무 예외 정확 일치, 정렬, 원본 불변 (`test_filters.py`)
-- hook의 기간·metric·중복 가드, JSON/text 처리, fail-closed, 완료 판정 (`test_hooks.py`)
-- cost-comparison 응답 형식 검증과 표 행 추출 (`test_comparison.py`)
-- 리포트 구역, 원본 금액, 서술 검증기의 금액 거부·월 허용 (`test_report.py`)
-- CLI 검증, mock 무접속 실행, discover-only 연결 종료 (`test_app.py`, `test_billing_mcp.py`)
-- scripted fake model로 실제 Strands 이벤트 루프 구동: 잘못된 월 호출 취소 후 재시도 성공, drivers 누락 시 리포트 거부, 완전한 실행의 LIVE 리포트 생성 (`test_agent_loop.py`)
-- 사전 점검 스크립트의 helper와 dry-run (`test_readiness.py`)
+- 확인한 MCP 서버 버전(`0.0.37`)은 권고 목록에 태그·재시작 여부 등 일부 필드를 전달하지 않는다. 누락 값은 `N/A`로 표시하고, 태그 예외 적용 여부는 확인 불가로 남긴다.
+- 출력 검증기는 일부 금액 표기를 걸러내지만, 설명의 사실성까지 보장하지는 않는다. 실제 모델의 설명이 조회 결과에 근거하는지는 live 검증에서 확인해야 한다.
+- 도구 호출 횟수는 제한하지만 전체 모델 호출·토큰 상한은 아직 설정하지 않았다. 실행 메트릭 기록과 MCP 서버 버전 고정도 남아 있다.
 
-## 13. 알려진 한계
-
-- 개발 환경에 AWS 자격증명이 없어 실제 Bedrock 모델과 실제 비용 데이터로 end-to-end 실행한 증거는 없다. MCP 연결·tool discovery, mock, scripted 루프 테스트까지만 확인했다.
-- 확인한 Billing MCP 서버 버전(0.0.37)은 `list_recommendations` 결과를 snake_case로 정규화하면서 `tags`, `restartNeeded`, `rollbackPossible`, `source`를 전달하지 않는다. 누락 값은 `N/A`로 표시하고, 태그 규칙은 live에서 적용할 수 없어 리포트에 "확인 불가"로 남긴다. 서버 명령이 `@latest`라 버전에 따라 전달 필드가 달라질 수 있다.
-- 모델의 호출 횟수나 토큰 상한을 두지 않았다. hook이 tool 호출을 제한하지만 모델이 취소 메시지에 반복 응답하면 모델 호출은 계속될 수 있다.
-- 항목별 변화 표는 상위 20건만 표시한다. 값은 바꾸지 않는다.
-- Mock fixture는 2026-07/2026-08 비교 전용이며 mock 설명은 LLM 출력이 아닌 고정 문구다.
-- 진행 중인 달을 비교 월로 쓸 수 있는지는 확인하지 않았다. 완료된 두 달을 권장한다.
-
-## 14. 향후 과제
-
-- 모델 호출 상한(Strands `Limits`)과 실행 메트릭(토큰, 호출 수, 모델 ID, 서버 버전) 기록
-- tool 호출과 취소를 출력하는 `--verbose` 옵션
-- 이전 리뷰의 권고 채택·기각 기록 반영
-- AWS MCP Server를 통한 상세 리소스 구성 확인
+다음 목표는 실제 데이터로 첫 리포트를 생성하고 콘솔 값과 대조하는 것이다. 추가 코드 보완 범위는 이 실행에서 확인한 결과를 바탕으로 정할 예정이다.
